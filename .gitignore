@@ -1,0 +1,16 @@
+.env
+/source-review*.json
+.pnpm-store/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+*.db
+web/node_modules/
+web/.next/
+/.playwright-browsers/
+web/*.tsbuildinfo
+web/playwright-report/
+web/test-results/
+docs/screenshots/issuearea-desktop.jpg

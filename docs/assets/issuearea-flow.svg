@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="164" viewBox="0 0 1120 164" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">IssueArea 뉴스 탐색 흐름</title>
+  <desc id="desc">출처에서 뉴스를 모으고 지역과 주제를 분류한 뒤 지도와 목록에서 원문으로 연결합니다.</desc>
+  <rect x="1" y="1" width="1118" height="162" rx="22" fill="#F4F8F7" stroke="#E0EAE7"/>
+  <g font-family="Arial, sans-serif">
+    <g transform="translate(34 31)">
+      <rect width="222" height="102" rx="17" fill="white" stroke="#DDE8E4"/>
+      <rect x="18" y="20" width="42" height="42" rx="12" fill="#E1F2EC"/>
+      <path d="M29 32H49M29 40H49M29 48H44" stroke="#087F68" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="75" y="38" fill="#153039" font-size="15" font-weight="700">뉴스 수집</text>
+      <text x="75" y="58" fill="#657981" font-size="11">검토된 RSS · API</text>
+      <text x="18" y="84" fill="#7A8D92" font-size="10">제목과 출처 정보 중심으로 저장</text>
+    </g>
+    <path d="M266 82H299" stroke="#8EB8AA" stroke-width="2" stroke-linecap="round"/><path d="M294 77L300 82L294 87" stroke="#8EB8AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(310 31)">
+      <rect width="222" height="102" rx="17" fill="white" stroke="#DDE8E4"/>
+      <rect x="18" y="20" width="42" height="42" rx="12" fill="#E8EFFA"/>
+      <circle cx="39" cy="41" r="11" stroke="#4169A1" stroke-width="2.5"/><path d="M39 34V41L45 45" stroke="#4169A1" stroke-width="2" stroke-linecap="round"/>
+      <text x="75" y="38" fill="#153039" font-size="15" font-weight="700">맥락 분류</text>
+      <text x="75" y="58" fill="#657981" font-size="11">지역 · 주제 · 시각</text>
+      <text x="18" y="84" fill="#7A8D92" font-size="10">중복을 줄이고 관련 지역을 연결</text>
+    </g>
+    <path d="M542 82H575" stroke="#8EB8AA" stroke-width="2" stroke-linecap="round"/><path d="M570 77L576 82L570 87" stroke="#8EB8AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(586 31)">
+      <rect width="222" height="102" rx="17" fill="white" stroke="#DDE8E4"/>
+      <rect x="18" y="20" width="42" height="42" rx="12" fill="#EAF3E6"/>
+      <path d="M29 31L38 27L46 31L49 39L45 46L47 52L39 55L33 49L29 44L31 38Z" fill="#73A17D"/><circle cx="37" cy="37" r="3" fill="#087F68"/><circle cx="44" cy="45" r="2.5" fill="#155E75"/>
+      <text x="75" y="38" fill="#153039" font-size="15" font-weight="700">지도와 목록</text>
+      <text x="75" y="58" fill="#657981" font-size="11">지역에서 이슈 탐색</text>
+      <text x="18" y="84" fill="#7A8D92" font-size="10">검색 · 기간 · 주제 필터</text>
+    </g>
+    <path d="M818 82H851" stroke="#8EB8AA" stroke-width="2" stroke-linecap="round"/><path d="M846 77L852 82L846 87" stroke="#8EB8AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(862 31)">
+      <rect width="222" height="102" rx="17" fill="white" stroke="#DDE8E4"/>
+      <rect x="18" y="20" width="42" height="42" rx="12" fill="#FFF0E3"/>
+      <path d="M30 31H47V49H30Z" stroke="#C47732" stroke-width="2.2" stroke-linejoin="round"/><path d="M34 36H44M34 41H42" stroke="#C47732" stroke-width="2" stroke-linecap="round"/><path d="M45 47L51 53" stroke="#C47732" stroke-width="2.3" stroke-linecap="round"/>
+      <text x="75" y="38" fill="#153039" font-size="15" font-weight="700">원문 확인</text>
+      <text x="75" y="58" fill="#657981" font-size="11">언론사 기사로 이동</text>
+      <text x="18" y="84" fill="#7A8D92" font-size="10">기사는 원문 출처에서 확인</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+{
+  "rights_status": "allowed",
+  "title_display_allowed": true,
+  "metadata_storage_allowed": true,
+  "commercial_use_allowed": true,
+  "terms_url": "https://mcst.go.kr/kor/s_notice/press/pressList.jsp",
+  "terms_checked_at": "2026-09-30T03:18:03Z",
+  "notes": "The official MCST press-release listing states that MCST press-release works may be used by anyone under KOGL Type 1 (attribution), including commercial use. The listing links the official RSS 2.0 feed. IssueArea stores and displays headline, publisher, publication time, and original URL only; each headline links directly to MCST. Credit MCST and link to the original source. Verified official RSS returned HTTP 200 and 10 dated entries on 2026-09-30."
+}

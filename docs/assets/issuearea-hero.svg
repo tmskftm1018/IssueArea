@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">IssueArea — 지역에서 발견하는 뉴스</title>
+  <desc id="desc">지역 이슈를 지도와 뉴스 카드로 탐색하는 IssueArea의 그래픽</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EFF8F5"/><stop offset=".58" stop-color="#F7FAFC"/><stop offset="1" stop-color="#E8F0F5"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#087F68"/><stop offset="1" stop-color="#155E75"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB" filterUnits="objectBoundingBox">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/><feOffset dy="9"/><feComponentTransfer><feFuncA type="linear" slope=".12"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#0F766E" fill-opacity=".12"/></pattern>
+  </defs>
+  <rect width="1200" height="360" rx="28" fill="url(#bg)"/>
+  <circle cx="1070" cy="18" r="190" fill="url(#dots)" opacity=".72"/>
+  <circle cx="1060" cy="190" r="164" fill="#D6EEE7" fill-opacity=".55"/>
+  <path d="M0 286C168 240 242 326 411 282C564 242 608 289 739 255V360H0V286Z" fill="#DDEEEA" fill-opacity=".7"/>
+  <rect x="62" y="56" width="50" height="50" rx="15" fill="url(#accent)"/>
+  <path d="M76 91V69H98V75H82V85H94V91H76Z" fill="white"/>
+  <path d="M94 84L101 67M96 68L101 67L101 72" stroke="#A7F3D0" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="128" y="89" fill="#12312D" font-family="Arial, sans-serif" font-size="24" font-weight="700">IssueArea</text>
+  <text x="62" y="161" fill="#087F68" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="3">KOREA NEWS, IN LOCAL CONTEXT</text>
+  <text x="62" y="215" fill="#142A35" font-family="Arial, sans-serif" font-size="38" font-weight="700">지역의 이슈를</text>
+  <text x="62" y="263" fill="#142A35" font-family="Arial, sans-serif" font-size="38" font-weight="700">한눈에 발견하다</text>
+  <text x="64" y="303" fill="#526875" font-family="Arial, sans-serif" font-size="16">지도에서 지역 뉴스를 찾고, 원문까지 이어서 확인하세요.</text>
+  <g filter="url(#shadow)">
+    <rect x="753" y="55" width="390" height="253" rx="24" fill="#FFFFFF"/>
+    <rect x="772" y="74" width="352" height="215" rx="16" fill="#F5F9F8"/>
+    <path d="M849 103L895 91L921 103L942 97L969 115L962 139L981 158L971 180L988 197L965 225L941 219L921 237L902 222L883 226L872 205L853 194L858 170L840 155L851 134L837 119L849 103Z" fill="#D9EAE5" stroke="#9BBEB4" stroke-width="2"/>
+    <path d="M861 121L902 140L936 120M858 166L904 154L961 171M879 201L908 180L958 213M902 93L901 139L916 176L908 222M943 99L935 145L962 171" stroke="#B5CEC7" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M878 121L894 111L910 117L918 131L908 143L889 142L878 132Z" fill="#0F766E" fill-opacity=".14"/>
+    <circle cx="902" cy="124" r="17" fill="#087F68" fill-opacity=".18"/><circle cx="902" cy="124" r="10" fill="#087F68"/><circle cx="902" cy="124" r="3" fill="white"/>
+    <circle cx="945" cy="169" r="14" fill="#155E75" fill-opacity=".15"/><circle cx="945" cy="169" r="8" fill="#155E75"/><circle cx="945" cy="169" r="2.5" fill="white"/>
+    <circle cx="900" cy="205" r="12" fill="#0F766E" fill-opacity=".15"/><circle cx="900" cy="205" r="7" fill="#0F766E"/><circle cx="900" cy="205" r="2" fill="white"/>
+    <rect x="793" y="241" width="314" height="34" rx="10" fill="white"/>
+    <circle cx="810" cy="258" r="5" fill="#0F766E"/><text x="823" y="262" fill="#36545C" font-family="Arial, sans-serif" font-size="11" font-weight="600">서울</text>
+    <circle cx="873" cy="258" r="5" fill="#155E75"/><text x="886" y="262" fill="#36545C" font-family="Arial, sans-serif" font-size="11" font-weight="600">부산</text>
+    <circle cx="935" cy="258" r="5" fill="#5C8D79"/><text x="948" y="262" fill="#36545C" font-family="Arial, sans-serif" font-size="11" font-weight="600">전남</text>
+    <rect x="1009" y="248" width="80" height="20" rx="10" fill="#E5F3EE"/><text x="1023" y="262" fill="#087F68" font-family="Arial, sans-serif" font-size="10" font-weight="700">전국 뉴스</text>
+  </g>
+  <rect x="741" y="119" width="148" height="74" rx="15" fill="white" filter="url(#shadow)"/>
+  <circle cx="761" cy="141" r="5" fill="#E68A3A"/>
+  <text x="775" y="145" fill="#536A73" font-family="Arial, sans-serif" font-size="10" font-weight="600">지역 이슈</text>
+  <text x="759" y="170" fill="#18333A" font-family="Arial, sans-serif" font-size="13" font-weight="700">서울 · 경기</text>
+  <text x="759" y="185" fill="#71858C" font-family="Arial, sans-serif" font-size="9">관련 기사 12건</text>
+  <rect x="1017" y="91" width="104" height="34" rx="17" fill="#12312D"/>
+  <circle cx="1035" cy="108" r="4" fill="#7CE0B7"/>
+  <text x="1046" y="112" fill="white" font-family="Arial, sans-serif" font-size="10" font-weight="600">지역별 탐색</text>
+</svg>

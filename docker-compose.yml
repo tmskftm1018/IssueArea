@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: newsmap
+      POSTGRES_USER: newsmap
+      POSTGRES_PASSWORD: newsmap
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U newsmap -d newsmap']
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  api:
+    build: ./backend
+    environment: &backend_env
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://newsmap:newsmap@postgres:5432/newsmap}
+      APP_ENV: ${APP_ENV:-development}
+      APP_USAGE_MODE: ${APP_USAGE_MODE:-development}
+      DEMO_MODE: ${DEMO_MODE:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      COLLECTOR_POLL_SECONDS: ${COLLECTOR_POLL_SECONDS:-60}
+      ARTICLE_RETENTION_DAYS: ${ARTICLE_RETENTION_DAYS:-30}
+      NEWSWIRE_PARTNER_ID: ${NEWSWIRE_PARTNER_ID:-}
+      NEWSWIRE_API_KEY: ${NEWSWIRE_API_KEY:-}
+      NEWSDATA_API_KEY: ${NEWSDATA_API_KEY:-}
+    command: [sh, -c, 'alembic upgrade head && python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000']
+    ports: ['8000:8000']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  collector:
+    build: ./backend
+    environment: *backend_env
+    command: [python, -m, app.collector]
+    depends_on:
+      api:
+        condition: service_healthy
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+        NEXT_PUBLIC_MAP_PROVIDER: ${NEXT_PUBLIC_MAP_PROVIDER:-leaflet_osm}
+        NEXT_PUBLIC_APP_ENV: ${APP_ENV:-development}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-IssueArea}
+    ports: ['3000:3000']
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  postgres_data:
