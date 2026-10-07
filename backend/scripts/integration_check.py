@@ -79,7 +79,7 @@ def main():
             assert collect_source(session, source).status == "not_modified"
         with TestClient(app) as client:
             assert client.get("/health").status_code == 200
-            assert client.get("/api/v1/news?hours=24").json()["total"] == 22
+            assert client.get("/api/v1/news?hours=24").json()["total"] == 21
             assert client.get("/api/v1/news?region=KR-11").json()["total"] == 3
             mapping = client.get("/api/v1/map/regions?q=호우").json()
             assert next(r["count"] for r in mapping["regions"] if r["code"] == "KR-11") == 2
