@@ -10,12 +10,15 @@ class RegionClassifier(Protocol):
 
 
 class RuleBasedRegionClassifier:
-    version = "rules-v2"
+    version = "rules-v3"
 
     def classify(self, title: str, regions: list[Region]) -> list[int]:
         # Accept common Korean particles after place names while rejecting compounds
         # such as 경기침체 and 서울대.
-        particles = r"(?:시|군|구|도)?(?:에서는|에서|으로|로|에는|에게|부터|까지|은|는|이가|이|가|을|를|에|의|과|와|도|만)?"
+        particles = (
+            r"(?:특례시|시|군|구|도|읍|면|동)?(?:청)?"
+            r"(?:에서는|에서|으로|로|에는|에게|부터|까지|은|는|이가|이|가|을|를|에|의|과|와|도|만)?"
+        )
         return [
             r.id
             for r in regions

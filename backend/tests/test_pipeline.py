@@ -10,6 +10,7 @@ from app.classifiers import RuleBasedRegionClassifier, RuleBasedTopicClassifier
 from app.collector import collect_source
 from app.db import utcnow
 from app.models import Article, CollectionRun, Region, Source
+from app.seed import seed
 from app.services import can_collect, canonical_url, clean_title
 from app.sources import Entry, FetchResult
 
@@ -25,6 +26,15 @@ def demo(session):
         ("서울·경기 집중호우", {"KR-11", "KR-41"}),
         ("‘10·29이태원참사 4주기 기억식’ 참석자 사전신청 접수", {"KR-11"}),
         ("부산 강풍", {"KR-26"}),
+        ("대구 달서구 도로 정비", {"KR-27"}),
+        ("인천 강화군 집중호우", {"KR-28"}),
+        ("홍천군 산불 대응", {"KR-51"}),
+        ("수원특례시 도로 정비", {"KR-41"}),
+        ("경기 광주시 교통 대책", {"KR-41"}),
+        ("영광군 농업 지원", {"KR-29"}),
+        ("부산 강서구 공사 안내", {"KR-26"}),
+        ("강서구 공사 안내", set()),
+        ("동구청 주민 설명회", set()),
         ("중구 교통사고", set()),
         ("경기침체 우려", set()),
         ("광주 행사", set()),
@@ -107,6 +117,57 @@ def test_deduplication(session):
     session.add(other)
     session.commit()
     assert collect_source(session, other, Adapter(entries[:1])).inserted_count == 1
+
+
+def test_existing_article_is_reclassified_with_expanded_locality_aliases(session):
+    source = demo(session)
+    url = "https://example.com/news/old-local-story"
+    article = Article(
+        source_id=source.id,
+        external_id="old-local-story",
+        title="수원시 도로 안전 대책",
+        original_url=url,
+        canonical_url=url,
+        title_hash="old-title-hash",
+        geo_scope="unknown",
+    )
+    session.add(article)
+    session.commit()
+
+    run = collect_source(
+        session,
+        source,
+        Adapter([Entry("수원시 도로 안전 대책", url, "old-local-story")]),
+    )
+
+    regions = list(session.scalars(select(Region)))
+    assert run.updated_count == 1 and run.inserted_count == 0
+    assert {r.code for r in regions if r.id in {tag.region_id for tag in article.regions}} == {
+        "KR-41"
+    }
+
+
+def test_seed_reclassifies_stored_articles_after_alias_updates(session):
+    source = demo(session)
+    article = Article(
+        source_id=source.id,
+        external_id="old-hongcheon-story",
+        title="홍천군 산불 대응",
+        original_url="https://example.com/news/old-hongcheon-story",
+        canonical_url="https://example.com/news/old-hongcheon-story",
+        title_hash="old-hongcheon-hash",
+        geo_scope="unknown",
+    )
+    session.add(article)
+    session.commit()
+
+    seed(session)
+
+    regions = list(session.scalars(select(Region)))
+    assert article.geo_scope == "regional"
+    assert {r.code for r in regions if r.id in {tag.region_id for tag in article.regions}} == {
+        "KR-51"
+    }
 
 
 def test_failure_isolation(session):

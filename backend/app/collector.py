@@ -124,35 +124,38 @@ def collect_source(session, source, adapter=None):
                     f"{title} {source.name}", regions
                 )
                 geo_scope = _geo_scope(source, title, region_ids)
-                if (
-                    not existing
-                    and source.feed_url == MOIS_PRESS_RELEASE_FEED
-                ):
+                if not existing:
                     existing = session.scalar(
                         select(Article).where(
-                            Article.source_id == source.id,
-                            Article.canonical_url == url,
+                            Article.source_id == source.id, Article.canonical_url == url
                         )
                     )
+                changed_existing = False
+                if existing:
+                    if existing.geo_scope != geo_scope:
+                        existing.geo_scope = geo_scope
+                        changed_existing = True
+                    existing_region_ids = {region.region_id for region in existing.regions}
+                    existing_region_versions = {
+                        region.classifier_version for region in existing.regions
+                    }
+                    if (
+                        existing_region_ids != set(region_ids)
+                        or existing_region_versions
+                        != ({RuleBasedRegionClassifier.version} if region_ids else set())
+                    ):
+                        existing.regions = [
+                            ArticleRegion(
+                                region_id=region_id,
+                                confidence=1.0,
+                                method="title_alias",
+                                classifier_version=RuleBasedRegionClassifier.version,
+                                is_primary=i == 0,
+                            )
+                            for i, region_id in enumerate(region_ids)
+                        ]
+                        changed_existing = True
                 if source.feed_url == MOIS_PRESS_RELEASE_FEED:
-                    changed_existing = False
-                    if existing:
-                        if existing.geo_scope != geo_scope:
-                            existing.geo_scope = geo_scope
-                            changed_existing = True
-                        existing_region_ids = {region.region_id for region in existing.regions}
-                        if existing_region_ids != set(region_ids):
-                            existing.regions = [
-                                ArticleRegion(
-                                    region_id=region_id,
-                                    confidence=1.0,
-                                    method="title_alias",
-                                    classifier_version=RuleBasedRegionClassifier.version,
-                                    is_primary=i == 0,
-                                )
-                                for i, region_id in enumerate(region_ids)
-                            ]
-                            changed_existing = True
                     if existing and existing.published_at is None:
                         if entry.published_at:
                             existing.published_at = entry.published_at
@@ -178,6 +181,13 @@ def collect_source(session, source, adapter=None):
                     if existing and changed_existing:
                         run.updated_count += 1
                         continue
+                elif (
+                    existing
+                    and changed_existing
+                    and not (source.adapter_type == "newswire" and entry.action == "update")
+                ):
+                    run.updated_count += 1
+                    continue
                 stamp = entry.published_at or utcnow()
                 digest = title_hash(title)
                 conditions = [Article.canonical_url == url]
@@ -229,7 +239,7 @@ def collect_source(session, source, adapter=None):
                         region_id=rid,
                         confidence=1.0,
                         method="title_alias",
-                        classifier_version="rules-v1",
+                        classifier_version=RuleBasedRegionClassifier.version,
                         is_primary=i == 0,
                     )
                     for i, rid in enumerate(region_ids)

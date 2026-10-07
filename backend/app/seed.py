@@ -1,9 +1,12 @@
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.catalog import REGIONS, TOPICS
+from app.classifiers import RuleBasedRegionClassifier
 from app.config import settings
 from app.db import SessionLocal, utcnow
-from app.models import Region, Source, Topic
+from app.models import Article, ArticleRegion, Region, Source, Topic
+from app.sources import MOIS_PRESS_RELEASE_FEED
 
 
 def seed(session):
@@ -48,6 +51,37 @@ def seed(session):
     if demo:
         demo.name = "IssueArea 개발용 예시"
         demo.enabled = settings.demo_mode
+    region_rows = list(session.scalars(select(Region)))
+    classifier = RuleBasedRegionClassifier()
+    for article in session.scalars(
+        select(Article).options(selectinload(Article.regions), selectinload(Article.source))
+    ):
+        region_ids = classifier.classify(
+            f"{article.title} {article.source.name}", region_rows
+        )
+        existing_ids = {tag.region_id for tag in article.regions}
+        existing_versions = {tag.classifier_version for tag in article.regions}
+        if (
+            existing_ids != set(region_ids)
+            or existing_versions != ({classifier.version} if region_ids else set())
+        ):
+            article.regions = [
+                ArticleRegion(
+                    region_id=region_id,
+                    confidence=1.0,
+                    method="title_alias",
+                    classifier_version=classifier.version,
+                    is_primary=index == 0,
+                )
+                for index, region_id in enumerate(region_ids)
+            ]
+        article.geo_scope = (
+            "regional"
+            if region_ids
+            else "national"
+            if article.source.feed_url == MOIS_PRESS_RELEASE_FEED or "전국" in article.title
+            else "unknown"
+        )
     session.commit()
 
 
