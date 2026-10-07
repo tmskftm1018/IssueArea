@@ -89,6 +89,7 @@ def test_mois_collector_backfills_existing_dates_once(session, monkeypatch):
     assert run.updated_count == 1 and run.inserted_count == 0
     assert article.published_at.replace(tzinfo=UTC) == expected
     assert article.published_precision == "date"
+    assert article.geo_scope == "national"
     assert calls == [ARTICLE_URL]
 
     collector.collect_source(session, source, Feed())

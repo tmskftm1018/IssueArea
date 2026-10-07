@@ -30,6 +30,14 @@ def _as_utc(value):
     return value
 
 
+def _geo_scope(source, title, region_ids):
+    if region_ids:
+        return "regional"
+    if source.feed_url == MOIS_PRESS_RELEASE_FEED or "전국" in title:
+        return "national"
+    return "unknown"
+
+
 def collect_source(session, source, adapter=None):
     if not can_collect(source, settings.app_usage_mode):
         raise PermissionError("Source is disabled or does not have permitted usage rights")
@@ -112,6 +120,10 @@ def collect_source(session, source, adapter=None):
                     continue
                 if not title:
                     continue
+                region_ids = RuleBasedRegionClassifier().classify(
+                    f"{title} {source.name}", regions
+                )
+                geo_scope = _geo_scope(source, title, region_ids)
                 if (
                     not existing
                     and source.feed_url == MOIS_PRESS_RELEASE_FEED
@@ -123,6 +135,24 @@ def collect_source(session, source, adapter=None):
                         )
                     )
                 if source.feed_url == MOIS_PRESS_RELEASE_FEED:
+                    changed_existing = False
+                    if existing:
+                        if existing.geo_scope != geo_scope:
+                            existing.geo_scope = geo_scope
+                            changed_existing = True
+                        existing_region_ids = {region.region_id for region in existing.regions}
+                        if existing_region_ids != set(region_ids):
+                            existing.regions = [
+                                ArticleRegion(
+                                    region_id=region_id,
+                                    confidence=1.0,
+                                    method="title_alias",
+                                    classifier_version=RuleBasedRegionClassifier.version,
+                                    is_primary=i == 0,
+                                )
+                                for i, region_id in enumerate(region_ids)
+                            ]
+                            changed_existing = True
                     if existing and existing.published_at is None:
                         if entry.published_at:
                             existing.published_at = entry.published_at
@@ -130,20 +160,24 @@ def collect_source(session, source, adapter=None):
                         else:
                             entry.published_at = fetch_mois_published_date(entry.url)
                             if not entry.published_at:
+                                if changed_existing:
+                                    run.updated_count += 1
                                 continue
                             entry.published_precision = "date"
                             existing.published_at = entry.published_at
                             existing.published_precision = entry.published_precision
-                        run.updated_count += 1
-                        continue
-                    if existing and not entry.published_at:
+                        changed_existing = True
+                    elif existing and not entry.published_at:
                         entry.published_at = existing.published_at
                         entry.published_precision = existing.published_precision
-                    elif not entry.published_at:
+                    elif not existing and not entry.published_at:
                         entry.published_at = fetch_mois_published_date(entry.url)
                         entry.published_precision = "date" if entry.published_at else None
                         if not entry.published_at:
                             continue
+                    if existing and changed_existing:
+                        run.updated_count += 1
+                        continue
                 stamp = entry.published_at or utcnow()
                 digest = title_hash(title)
                 conditions = [Article.canonical_url == url]
@@ -166,9 +200,6 @@ def collect_source(session, source, adapter=None):
                 ):
                     run.duplicate_count += 1
                     continue
-                region_ids = RuleBasedRegionClassifier().classify(
-                    f"{title} {source.name}", regions
-                )
                 # NewsData's broad national feed is useful only when the headline
                 # itself identifies a place; otherwise it pollutes the local issue map.
                 if source.adapter_type == "newsdata" and not region_ids:
@@ -185,9 +216,7 @@ def collect_source(session, source, adapter=None):
                     publisher_name=entry.publisher_name or source.name,
                     published_at=entry.published_at,
                     published_precision=entry.published_precision,
-                    geo_scope="regional"
-                    if region_ids
-                    else ("national" if "전국" in title else "unknown"),
+                    geo_scope=geo_scope,
                 )
                 for key, value in values.items():
                     setattr(article, key, value)
