@@ -16,7 +16,7 @@ Next.js/React/TypeScript/Tailwind, FastAPI/SQLAlchemy, PostgreSQL Compose, Alemb
 
 - Playwright 브라우저 E2E 6개: 뉴스 필터·원문 링크 보안, 지도 클러스터 확대, API 재시도, 빈 결과·필터 초기화, 로딩 상태, 보도자료 카드 표시. 실행법은 README 테스트 항목 참조.
 - 뉴스 카드·에러·로딩 상태의 컴포넌트 단위 테스트 분리
-- RSS의 redirect 제한, 500개 초과 entry 절단, 요청 헤더와 응답 크기 경계 테스트 보강. 기존 304·500·malformed·2 MiB 초과·timeout 테스트는 완료.
+- RSS 경계 테스트 완료: 3회 redirect 허용 및 4회 redirect 거부, 2 MiB 정확한 크기 허용 및 초과 거부, 500개 entry 상한, 조건부 요청 헤더, 304·500·malformed·timeout.
 - 수집 실패 상세 관측과 운영 로그 정비
 - 라이브 뉴스 출처 이용조건 검토 후 등록
 

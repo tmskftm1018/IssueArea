@@ -209,7 +209,7 @@ docker compose exec -e DATABASE_URL=postgresql+psycopg://newsmap:newsmap@postgre
 - 프런트엔드 4개 테스트: URL 상태 복원, 지도 집계에서 선택 지역 제외, 잘못된 값 처리, 외부 링크 보안.
 - 타입 검사·린트·Next.js 빌드, 로컬 SQLite migration·schema check·seed·Collector와 Compose 설정 검사 수행.
 - Docker에서 PostgreSQL·API·수집기·웹 기동, migration schema check, 실제 HTTP RSS와 행 잠금 통합 테스트가 통과했습니다. 테스트용 기사는 별도 DB에만 저장됩니다.
-- 브라우저 E2E 6개: 뉴스 필터·원문 링크 보안, 지도 클러스터 확대, API 재시도, 빈 결과·필터 초기화, 로딩 상태, 보도자료 카드 표시를 fixture 기반으로 검증합니다. 남은 작업은 컴포넌트 단위 테스트 분리, RSS redirect·entry 제한 검증, 운영 로그 정비입니다.
+- 브라우저 E2E 6개: 뉴스 필터·원문 링크 보안, 지도 클러스터 확대, API 재시도, 빈 결과·필터 초기화, 로딩 상태, 보도자료 카드 표시를 fixture 기반으로 검증합니다. 백엔드 RSS는 3회 리다이렉트, 2 MiB 경계, 500개 entry 제한과 조건부 요청 헤더를 테스트합니다. 남은 작업은 컴포넌트 단위 테스트 분리와 운영 로그 정비입니다.
 - 로컬 브라우저에서 Demo 기사·지역 집계, 서울 선택과 주제 필터를 확인했습니다. 마지막 확인 시 브라우저 error/warn 로그는 없었습니다.
 - 제목 alias로만 지역을 분류합니다. `중구`와 단독 `광주` 등 모호한 표현을 임의 지역에 배치하지 않습니다. `서울대`, `경기침체`와 같은 부분 문자열 오분류를 피하기 위해 단어 경계를 사용하며 이에 따라 일부 지역 조사형 표현은 미분류될 수 있습니다.
 - freshness는 출처별 `max(15분, 수집 간격 × 3)`을 기준으로 계산합니다. 일부만 정상인 경우 degraded, 정상 출처가 없으면 stale입니다.
