@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import timedelta
 
 import httpx
@@ -88,7 +90,7 @@ def test_http_failure_no_retry_or_key_logging(session, status):
         assert stamp >= utcnow() + timedelta(hours=23)
 
 
-def test_free_quota_guard_and_registry(session):
+def test_free_quota_guard_and_registry(session, caplog):
     s = source(session)
     review_source(session, s.id, review())
     with pytest.raises(ValueError):
@@ -103,8 +105,15 @@ def test_free_quota_guard_and_registry(session):
         def fetch(self, source):
             pytest.fail("Local budget should prevent network calls")
 
-    assert collect_source(session, s, NeverCall()) is None
+    with caplog.at_level(logging.WARNING, logger="collector"):
+        assert collect_source(session, s, NeverCall()) is None
     assert len(list(session.scalars(select(CollectionRun)))) == 180
+    message = next(record.message for record in caplog.records if record.name == "collector")
+    event = json.loads(message)
+    assert event["event"] == "quota_deferred"
+    assert event["reason"] == "daily_request_limit"
+    assert event["retry_delay_seconds"] == 86400
+    assert event["source"] == s.id
 
 
 def test_bad_response_rejected():

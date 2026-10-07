@@ -1,5 +1,8 @@
+import json
+import logging
 from datetime import timedelta
 
+import httpx
 import pytest
 from sqlalchemy import func, select
 
@@ -115,6 +118,38 @@ def test_failure_isolation(session):
     assert source.consecutive_failures == 1
     assert collect_source(session, source).status == "success"
     assert source.consecutive_failures == 0
+
+
+def test_failure_log_has_retry_details_without_request_credentials(session, caplog):
+    source = demo(session)
+    secret_url = "https://user:password@example.com/feed?api_key=secret"
+    request = httpx.Request("GET", secret_url)
+    response = httpx.Response(503, request=request)
+
+    class Broken:
+        def fetch(self, source):
+            raise httpx.HTTPStatusError(
+                f"upstream failed at {secret_url}", request=request, response=response
+            )
+
+    with caplog.at_level(logging.WARNING, logger="collector"):
+        run = collect_source(session, source, Broken())
+
+    record = next(record for record in caplog.records if record.name == "collector")
+    event = json.loads(record.message)
+    assert run.status == "failed"
+    assert record.levelno == logging.WARNING
+    assert event["source"] == source.id
+    assert event["source_name"] == source.name
+    assert event["adapter"] == "demo"
+    assert event["error_type"] == "HTTPStatusError"
+    assert event["http_status"] == 503
+    assert event["failure_count"] == 1
+    assert event["retry_delay_seconds"] > 500
+    assert event["retry_delay_seconds"] <= 600
+    assert "retry_at" in event
+    assert secret_url not in record.message
+    assert "password" not in record.message and "api_key" not in record.message
 
 
 def test_304(session):

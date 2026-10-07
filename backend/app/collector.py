@@ -2,7 +2,7 @@ import argparse
 import json
 import logging
 import time
-from datetime import timedelta
+from datetime import UTC, timedelta
 
 import httpx
 from sqlalchemy import delete, func, or_, select
@@ -17,6 +17,12 @@ from app.services import can_collect, canonical_url, clean_title, title_hash
 from app.sources import DemoSourceAdapter, RSSSourceAdapter
 
 log = logging.getLogger("collector")
+
+
+def _as_utc(value):
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
 
 
 def collect_source(session, source, adapter=None):
@@ -38,6 +44,24 @@ def collect_source(session, source, adapter=None):
         if attempts >= 180:
             source.next_fetch_at = utcnow() + timedelta(hours=24)
             session.commit()
+            retry_at = _as_utc(source.next_fetch_at)
+            log.warning(
+                json.dumps(
+                    {
+                        "timestamp": utcnow().isoformat(),
+                        "level": "WARNING",
+                        "component": "collector",
+                        "source": source.id,
+                        "source_name": source.name,
+                        "adapter": source.adapter_type,
+                        "event": "quota_deferred",
+                        "reason": "daily_request_limit",
+                        "retry_at": retry_at.isoformat(),
+                        "retry_delay_seconds": 86400,
+                    },
+                    ensure_ascii=False,
+                )
+            )
             return None
     run = CollectionRun(source_id=source.id, status="running")
     session.add(run)
@@ -188,19 +212,42 @@ def collect_source(session, source, adapter=None):
             source.next_fetch_at = utcnow() + timedelta(hours=24)
     run.finished_at = utcnow()
     session.commit()
-    log.info(
-        json.dumps(
+    failed = run.status == "failed"
+    event = {
+        "timestamp": utcnow().isoformat(),
+        "level": "WARNING" if failed else "INFO",
+        "component": "collector",
+        "source": source.id,
+        "source_name": source.name,
+        "adapter": source.adapter_type,
+        "event": run.status,
+        "http_status": run.http_status,
+        "fetched": run.fetched_count,
+        "inserted": run.inserted_count,
+        "duplicates": run.duplicate_count,
+        "updated": run.updated_count,
+        "deleted": run.deleted_count,
+    }
+    if failed:
+        retry_at = _as_utc(source.next_fetch_at)
+        now = utcnow()
+        event.update(
             {
-                "timestamp": utcnow().isoformat(),
-                "level": "INFO",
-                "component": "collector",
-                "source": source.id,
-                "event": run.status,
-                "message": f"inserted={run.inserted_count}, duplicate={run.duplicate_count}, "
-                f"updated={run.updated_count}, deleted={run.deleted_count}",
+                "error_type": run.error_type,
+                "failure_count": source.consecutive_failures,
+                "retry_at": retry_at.isoformat() if retry_at else None,
+                "retry_delay_seconds": max(
+                    0, round((retry_at - now).total_seconds())
+                )
+                if retry_at
+                else None,
             }
         )
-    )
+    message = json.dumps(event, ensure_ascii=False)
+    if failed:
+        log.warning(message)
+    else:
+        log.info(message)
     return run
 
 
