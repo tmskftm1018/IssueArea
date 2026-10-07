@@ -1,12 +1,12 @@
 from datetime import UTC, datetime
 
 from alembic.config import Config
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
 from alembic import command
 from app import db
-from app.models import Article, ArticleRegion, Region, Source
+from app.models import ArticleRegion, Region, Source
 
 
 def test_merge_gwangju_jeonnam_is_reversible(tmp_path, monkeypatch):
@@ -41,30 +41,36 @@ def test_merge_gwangju_jeonnam_is_reversible(tmp_path, monkeypatch):
         )
         session.add_all([gwangju, jeonnam, source])
         session.flush()
-        both = Article(
-            source_id=source.id,
-            title="통합 지역 기사",
-            original_url="https://example.test/both",
-            canonical_url="https://example.test/both",
-            title_hash="both",
-            published_at=datetime(2026, 9, 30, tzinfo=UTC),
-            geo_scope="regional",
+        created = datetime(2026, 9, 30, tzinfo=UTC)
+
+        def insert_article(title, url, digest):
+            return session.execute(
+                text(
+                    """INSERT INTO articles (
+                    source_id, title, original_url, canonical_url, title_hash,
+                    published_at, collected_at, geo_scope, created_at, updated_at
+                    ) VALUES (
+                    :source_id, :title, :url, :url, :digest,
+                    :published_at, :published_at, 'regional', :published_at, :published_at
+                    ) RETURNING id"""
+                ),
+                {
+                    "source_id": source.id,
+                    "title": title,
+                    "url": url,
+                    "digest": digest,
+                    "published_at": created,
+                },
+            ).scalar_one()
+
+        both_id = insert_article(
+            "통합 지역 기사", "https://example.test/both", "both"
         )
-        jeonnam_only = Article(
-            source_id=source.id,
-            title="전남 기사",
-            original_url="https://example.test/jeonnam",
-            canonical_url="https://example.test/jeonnam",
-            title_hash="jeonnam",
-            published_at=datetime(2026, 9, 30, tzinfo=UTC),
-            geo_scope="regional",
-        )
-        session.add_all([both, jeonnam_only])
-        session.flush()
+        jeonnam_id = insert_article("전남 기사", "https://example.test/jeonnam", "jeonnam")
         session.add_all(
             [
                 ArticleRegion(
-                    article_id=both.id,
+                    article_id=both_id,
                     region_id=gwangju.id,
                     confidence=0.8,
                     method="title_alias",
@@ -72,7 +78,7 @@ def test_merge_gwangju_jeonnam_is_reversible(tmp_path, monkeypatch):
                     is_primary=True,
                 ),
                 ArticleRegion(
-                    article_id=both.id,
+                    article_id=both_id,
                     region_id=jeonnam.id,
                     confidence=0.9,
                     method="title_alias",
@@ -80,7 +86,7 @@ def test_merge_gwangju_jeonnam_is_reversible(tmp_path, monkeypatch):
                     is_primary=False,
                 ),
                 ArticleRegion(
-                    article_id=jeonnam_only.id,
+                    article_id=jeonnam_id,
                     region_id=jeonnam.id,
                     confidence=0.7,
                     method="title_alias",
@@ -90,7 +96,6 @@ def test_merge_gwangju_jeonnam_is_reversible(tmp_path, monkeypatch):
             ]
         )
         session.commit()
-        both_id, jeonnam_id = both.id, jeonnam_only.id
         gwangju_id, old_jeonnam_id = gwangju.id, jeonnam.id
 
     command.upgrade(config, "head")

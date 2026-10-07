@@ -52,4 +52,14 @@ describe("NewsCard", () => {
     expect(markup).not.toContain("<a ");
     expect(markup).not.toContain("javascript:");
   });
+
+  it("shows a publication date without inventing an exact time", () => {
+    const markup = renderToStaticMarkup(
+      createElement(NewsCard, {
+        article: makeArticle({ published_at: "2026-10-06T15:00:00Z", published_precision: "date" }),
+      }),
+    );
+    expect(markup).toContain("2026. 10. 7.");
+    expect(markup).not.toContain("시간 전");
+  });
 });

@@ -23,6 +23,9 @@ export function safeArticleUrl(url: string): boolean {
 export function koreanTime(value: string): string {
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value));
 }
+export function koreanDate(value: string): string {
+  return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric", day: "numeric" }).format(new Date(value));
+}
 export function relativeKoreanTime(value: string): string {
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (!Number.isFinite(elapsedSeconds)) return "시간 정보 없음";

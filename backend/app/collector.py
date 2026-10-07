@@ -14,7 +14,12 @@ from app.models import Article, ArticleRegion, ArticleTopic, CollectionRun, Regi
 from app.newsdata import FreeQuotaExceeded, NewsDataSourceAdapter
 from app.newswire import NewswireSourceAdapter
 from app.services import can_collect, canonical_url, clean_title, title_hash
-from app.sources import DemoSourceAdapter, RSSSourceAdapter
+from app.sources import (
+    MOIS_PRESS_RELEASE_FEED,
+    DemoSourceAdapter,
+    RSSSourceAdapter,
+    fetch_mois_published_date,
+)
 
 log = logging.getLogger("collector")
 
@@ -107,6 +112,38 @@ def collect_source(session, source, adapter=None):
                     continue
                 if not title:
                     continue
+                if (
+                    not existing
+                    and source.feed_url == MOIS_PRESS_RELEASE_FEED
+                ):
+                    existing = session.scalar(
+                        select(Article).where(
+                            Article.source_id == source.id,
+                            Article.canonical_url == url,
+                        )
+                    )
+                if source.feed_url == MOIS_PRESS_RELEASE_FEED:
+                    if existing and existing.published_at is None:
+                        if entry.published_at:
+                            existing.published_at = entry.published_at
+                            existing.published_precision = entry.published_precision or "datetime"
+                        else:
+                            entry.published_at = fetch_mois_published_date(entry.url)
+                            if not entry.published_at:
+                                continue
+                            entry.published_precision = "date"
+                            existing.published_at = entry.published_at
+                            existing.published_precision = entry.published_precision
+                        run.updated_count += 1
+                        continue
+                    if existing and not entry.published_at:
+                        entry.published_at = existing.published_at
+                        entry.published_precision = existing.published_precision
+                    elif not entry.published_at:
+                        entry.published_at = fetch_mois_published_date(entry.url)
+                        entry.published_precision = "date" if entry.published_at else None
+                        if not entry.published_at:
+                            continue
                 stamp = entry.published_at or utcnow()
                 digest = title_hash(title)
                 conditions = [Article.canonical_url == url]
@@ -147,6 +184,7 @@ def collect_source(session, source, adapter=None):
                     title_hash=digest,
                     publisher_name=entry.publisher_name or source.name,
                     published_at=entry.published_at,
+                    published_precision=entry.published_precision,
                     geo_scope="regional"
                     if region_ids
                     else ("national" if "전국" in title else "unknown"),

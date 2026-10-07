@@ -67,6 +67,7 @@ class Article(Base):
     canonical_url: Mapped[str] = mapped_column(String(2048), index=True)
     title_hash: Mapped[str] = mapped_column(String(64), index=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    published_precision: Mapped[str | None] = mapped_column(String(16))
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )

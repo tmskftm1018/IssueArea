@@ -12,6 +12,7 @@ from app.db import SessionLocal, get_session, utcnow
 from app.models import Article, ArticleRegion, ArticleTopic, CollectionRun, Region, Source, Topic
 from app.safety import check_startup
 from app.services import can_collect
+from app.sources import MOIS_PRESS_RELEASE_FEED
 
 
 @asynccontextmanager
@@ -34,11 +35,19 @@ DB = Annotated[Session, Depends(get_session)]
 def filtered(session, hours, topics, q, region=None):
     if hours not in {1, 6, 24, 168}:
         raise HTTPException(422, "hours must be one of 1, 6, 24, 168")
-    query = select(Article).where(
-        func.coalesce(Article.published_at, Article.collected_at)
-        >= utcnow() - timedelta(hours=hours),
-        func.coalesce(Article.published_at, Article.collected_at) <= utcnow(),
+    now = utcnow()
+    since = now - timedelta(hours=hours)
+    date_only_published = (
+        (Article.published_precision == "date")
+        & (Article.published_at > since - timedelta(days=1))
+        & (Article.published_at <= now)
     )
+    exact_or_unknown_published = (
+        Article.published_precision.is_distinct_from("date")
+        & (func.coalesce(Article.published_at, Article.collected_at) >= since)
+        & (func.coalesce(Article.published_at, Article.collected_at) <= now)
+    )
+    query = select(Article).where(date_only_published | exact_or_unknown_published)
     # Apply registry visibility rules to historical records as well as new collections.
     visible = select(Source.id).where(
         Source.enabled.is_(True),
@@ -51,6 +60,12 @@ def filtered(session, hours, topics, q, region=None):
     if not settings.demo_mode:
         visible = visible.where(Source.adapter_type != "demo")
     query = query.where(Article.source_id.in_(visible))
+    # Don't treat newly imported MOIS headlines as recent when their page date
+    # could not be read; retries can fill the date on the next collection run.
+    mois_sources = select(Source.id).where(Source.feed_url == MOIS_PRESS_RELEASE_FEED)
+    query = query.where(
+        (Article.source_id.not_in(mois_sources)) | Article.published_at.is_not(None)
+    )
     # Hide previously collected, non-local NewsData headlines after tightening its
     # collection rules. This leaves other RSS and press-release sources unaffected.
     newsdata_sources = select(Source.id).where(Source.adapter_type == "newsdata")
@@ -151,6 +166,7 @@ def news(
                 else "news",
                 "url": a.original_url,
                 "published_at": iso(a.published_at),
+                "published_precision": a.published_precision,
                 "collected_at": iso(a.collected_at),
                 "geo_scope": a.geo_scope,
                 "regions": [{"code": ar.region.code, "name": ar.region.name} for ar in a.regions],
