@@ -12,7 +12,7 @@ const articles = [
   { id: 3, title: "부산 해양 산업 동향", source: "IssueArea 테스트 뉴스", content_type: "news", url: "https://news.example.test/busan", published_at: "2026-09-30T00:00:00Z", collected_at: "2026-09-30T00:05:00Z", geo_scope: "regional", regions: [{ code: "KR-26", name: "부산광역시" }], topics: [{ slug: "economy", name: "경제" }] },
 ];
 
-async function mockApi(page: Page, options: { failNewsUntilRetry?: boolean } = {}) {
+async function mockApi(page: Page, options: { failNewsUntilRetry?: boolean; delayNewsMs?: number } = {}) {
   let shouldFailNews = Boolean(options.failNewsUntilRetry);
   page.on("requestfailed", request => {
     if (request.url().includes("/api/v1/")) console.log(`API request failed: ${request.url()}`);
@@ -24,6 +24,7 @@ async function mockApi(page: Page, options: { failNewsUntilRetry?: boolean } = {
       return;
     }
     if (url.pathname.endsWith("/news")) {
+      if (options.delayNewsMs) await new Promise(resolve => setTimeout(resolve, options.delayNewsMs));
       const items = articles.filter(article =>
         (!url.searchParams.get("region") || article.regions.some(region => region.code === url.searchParams.get("region"))) &&
         (!url.searchParams.get("topics") || article.topics.some(topic => url.searchParams.get("topics")?.split(",").includes(topic.slug))) &&
@@ -87,4 +88,31 @@ test("일시적 API 오류를 다시 시도하면 뉴스 목록을 복구한다"
   api.recoverNews();
   await page.getByRole("button", { name: "다시 시도" }).click();
   await expect(page.getByRole("link", { name: "서울 반도체 산업 지원 발표" })).toBeVisible();
+});
+
+test("검색 결과가 없으면 안내를 보이고 필터 초기화로 뉴스 목록을 복구한다", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/");
+  const search = page.getByRole("textbox", { name: "뉴스 제목 검색" });
+  await search.fill("존재하지 않는 뉴스");
+  await expect(page.getByText("조건에 맞는 뉴스가 없습니다.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "필터 초기화" }).click();
+  await expect(page.getByRole("link", { name: "서울 반도체 산업 지원 발표" })).toBeVisible();
+  await expect(search).toHaveValue("");
+});
+
+test("뉴스를 불러오는 동안 접근 가능한 로딩 상태를 표시한다", async ({ page }) => {
+  await mockApi(page, { delayNewsMs: 500 });
+  await page.goto("/");
+  await expect(page.getByRole("status", { name: "뉴스 불러오는 중" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "서울 반도체 산업 지원 발표" })).toBeVisible();
+});
+
+test("보도자료 카드는 유형을 표시하면서 제목을 원문으로 연결한다", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/");
+  const headline = page.getByRole("link", { name: "인천 교통 정책 발표" });
+  const card = page.locator("article.news-card").filter({ has: headline });
+  await expect(card.getByText("보도자료", { exact: true })).toBeVisible();
+  await expect(headline).toHaveAttribute("href", "https://news.example.test/incheon");
 });
