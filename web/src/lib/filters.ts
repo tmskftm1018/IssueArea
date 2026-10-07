@@ -1,10 +1,12 @@
-export type Filters = { region: string; topics: string[]; hours: number; q: string; page: number };
-export const defaults: Filters = { region: "", topics: [], hours: 24, q: "", page: 1 };
+export type Filters = { region: string; locality: string; drilldown: boolean; topics: string[]; hours: number; q: string; page: number };
+export const defaults: Filters = { region: "", locality: "", drilldown: false, topics: [], hours: 24, q: "", page: 1 };
 export function readFilters(query: string): Filters {
   const p = new URLSearchParams(query);
   const hours = Number(p.get("hours") || 24);
   const page = Number(p.get("page") || 1);
-  return { region: p.get("region") || "", topics: (p.get("topics") || "").split(",").filter(Boolean),
+  const region = p.get("region") || "";
+  const locality = p.get("locality") || "";
+  return { region, locality, drilldown: Boolean(region && (locality || p.get("drilldown") === "1")), topics: (p.get("topics") || "").split(",").filter(Boolean),
     hours: [1, 6, 24, 168].includes(hours) ? hours : 24, q: (p.get("q") || "").slice(0, 200),
     page: Number.isInteger(page) && page > 0 ? page : 1 };
 }
@@ -13,6 +15,8 @@ export function queryFor(f: Filters, includeRegion = true): string {
   if (f.topics.length) p.set("topics", f.topics.join(","));
   if (f.q) p.set("q", f.q);
   if (includeRegion && f.region) p.set("region", f.region);
+  if (includeRegion && f.locality) p.set("locality", f.locality);
+  if (includeRegion && f.region && f.drilldown) p.set("drilldown", "1");
   if (includeRegion) p.set("page", String(f.page));
   return p.toString();
 }

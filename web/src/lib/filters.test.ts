@@ -10,6 +10,14 @@ describe("filter URL semantics", () => {
     const query = queryFor({ ...defaults, region: "KR-11", page: 4, q: "산불" }, false);
     assert.equal(query, "hours=24&q=%EC%82%B0%EB%B6%88");
   });
+  it("shares the selected city or county in the URL", () => {
+    const state = { ...defaults, region: "KR-41", locality: "수원시", drilldown: true, page: 3 };
+    assert.deepEqual(readFilters(queryFor(state)), state);
+  });
+  it("keeps the map at city or county level after refresh", () => {
+    const state = { ...defaults, region: "KR-11", drilldown: true };
+    assert.deepEqual(readFilters(queryFor(state)), state);
+  });
   it("rejects unsupported time and pagination values", () => {
     assert.deepEqual(readFilters("hours=2&page=-1"), defaults);
   });

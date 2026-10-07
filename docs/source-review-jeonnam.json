@@ -1,0 +1,9 @@
+{
+  "rights_status": "conditional",
+  "title_display_allowed": true,
+  "metadata_storage_allowed": true,
+  "commercial_use_allowed": true,
+  "terms_url": "https://www.jeonnam.go.kr/contentsView.do?menuId=jeonnam0816000000",
+  "terms_checked_at": "2026-10-07T15:04:00+09:00",
+  "notes": "전남광주통합특별시 공식 보도자료 RSS를 사용합니다. 2026-10-07 현재 최근 10개 원문에서 모두 공공누리 제1유형을 확인했습니다. 각 기사의 공식 KOGL 링크와 제1유형 표기를 모두 확인한 경우만 제목·출처·원문 URL·게시 시각을 저장하고 표시합니다. 제2~4유형으로 바뀐 기사는 기존 저장본을 삭제하고, 라이선스 미표시·확인 실패는 보류합니다. RSS가 제공한 HTTP 기사 링크는 공식 호스트와 보도자료 경로·식별자를 검사한 다음 HTTPS로 바꾸어 사용합니다. 본문·사진·첨부파일은 수집하지 않으며 출처와 원문 링크를 제공합니다. 필터 또는 이용정책 변경 시 재검토합니다."
+}

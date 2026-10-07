@@ -10,7 +10,7 @@ class RegionClassifier(Protocol):
 
 
 class RuleBasedRegionClassifier:
-    version = "rules-v3"
+    version = "rules-v4"
 
     def classify(self, title: str, regions: list[Region]) -> list[int]:
         # Accept common Korean particles after place names while rejecting compounds

@@ -1,0 +1,9 @@
+{
+  "rights_status": "conditional",
+  "title_display_allowed": true,
+  "metadata_storage_allowed": true,
+  "commercial_use_allowed": true,
+  "terms_url": "https://www.gg.go.kr/contents/contents.do?ciIdx=1066&menuId=2772",
+  "terms_checked_at": "2026-10-07T14:45:00+09:00",
+  "notes": "경기도뉴스포털 공식 보도자료 RSS를 사용합니다. 2026-10-07 현재 RSS 최근 10건의 원문 페이지에 연결된 KOGL 링크에서 제1유형(출처표시)을 확인했습니다. RSS 항목마다 원문에서 공식 KOGL 링크와 제1유형 표기를 모두 확인한 경우에만 제목·출처·원문 URL·게시 시각을 저장하고 표시합니다. 제2~4유형 표시는 기존 저장 항목을 삭제하고, 라이선스 누락·확인 실패는 신규 수집을 보류합니다. 본문·사진·첨부파일은 가져오지 않으며 출처와 원문 링크를 제공합니다. 필터 동작 또는 공식 이용정책이 바뀌면 즉시 재검토합니다."
+}

@@ -40,3 +40,38 @@ def test_invalid_filters(client):
 def test_empty(client):
     assert client.get("/api/v1/news").json()["items"] == []
     assert client.get("/api/v1/system/freshness").json()["status"] == "stale"
+
+
+def test_sigungu_map_and_title_filter(session, client, monkeypatch):
+    populate(session)
+    from app import main
+
+    monkeypatch.setattr(
+        main,
+        "get_sigungu_boundaries",
+        lambda: {
+            "type": "FeatureCollection",
+            "features": [
+                {"type": "Feature", "geometry": None, "properties": {"sig_cd": "11000", "sig_kor_nm": "서울"}},
+                {"type": "Feature", "geometry": None, "properties": {"sig_cd": "26000", "sig_kor_nm": "부산"}},
+            ],
+        },
+    )
+
+    response = client.get("/api/v1/map/subregions?region=KR-11")
+    assert response.status_code == 200
+    assert [feature["properties"]["name"] for feature in response.json()["features"]] == ["서울"]
+    assert response.json()["features"][0]["properties"]["count"] > 0
+    selected = client.get("/api/v1/news?region=KR-11&locality=%EC%84%9C%EC%9A%B8")
+    assert selected.status_code == 200
+    assert selected.json()["total"] > 0
+    assert client.get("/api/v1/news?locality=%EC%84%9C%9C%EC%9A%B8").status_code == 422
+
+
+def test_locality_filter_accepts_common_shortened_city_and_district_names():
+    from app.main import locality_title_terms
+
+    assert set(locality_title_terms("성남시 분당구")) == {"성남시 분당구", "분당구", "분당"}
+    assert set(locality_title_terms("수원시")) == {"수원시", "수원"}
+    assert "이태원" in locality_title_terms("용산구", "KR-11")
+    assert "이태원" not in locality_title_terms("용산구", "KR-26")

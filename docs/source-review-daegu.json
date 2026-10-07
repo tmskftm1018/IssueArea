@@ -1,0 +1,9 @@
+{
+  "rights_status": "conditional",
+  "title_display_allowed": true,
+  "metadata_storage_allowed": true,
+  "commercial_use_allowed": true,
+  "terms_url": "https://www.daegu.go.kr/index.do?menu_id=00050251",
+  "terms_checked_at": "2026-10-07T15:04:00+09:00",
+  "notes": "대구광역시 뉴스룸 공식 시정뉴스 RSS를 사용합니다. 2026-10-07 현재 최근 20개 피드 항목의 원문에서 10건은 공공누리 1유형, 10건은 4유형으로 확인했습니다. 각 원문에 연결된 공식 KOGL 링크와 제1유형 표시를 모두 확인한 경우만 제목·출처·원문 URL·게시 시각을 저장하고 표시합니다. 제2~4유형으로 바뀐 기사는 기존 저장본을 삭제하고, 유형 미표시·확인 실패·외부 주소 항목은 보류합니다. 본문·사진·첨부파일은 수집하지 않으며 대구광역시 출처와 원문 링크를 제공합니다. 필터 또는 이용정책 변경 시 재검토합니다."
+}

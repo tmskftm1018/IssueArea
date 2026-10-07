@@ -27,7 +27,7 @@ LOCALITY_ALIASES = {
     "KR-27": ["수성구", "달서구", "달성군", "군위군", "군위", "대구 수성구"],
     "KR-28": [
         "남동구", "연수구", "미추홀구", "부평구", "계양구", "강화군", "옹진군",
-        "강화", "인천 동구", "인천 중구", "인천 서구",
+        "인천 동구", "인천 중구", "인천 서구",
     ],
     # The 5 Gwangju districts and 22 Jeonnam cities/counties share the merged map region.
     "KR-29": [

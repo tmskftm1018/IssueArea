@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from html.parser import HTMLParser
 from typing import Literal
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 import feedparser
@@ -15,6 +15,10 @@ from app.db import utcnow
 from app.models import Source
 
 MOIS_PRESS_RELEASE_FEED = "https://www.mois.go.kr/gpms/view/jsp/rss/rss.jsp?ctxCd=1012"
+MODS_PRESS_RELEASE_FEED = "https://mods.go.kr/board.es?mid=a10301010000&bid=a103010100&act=rss"
+GYEONGGI_PRESS_RELEASE_FEED = "https://gnews.gg.go.kr/rss/gnewsRssBodo.do"
+DAEGU_NEWS_FEED = "https://info.daegu.go.kr/rss/rss.php?sgidx=1"
+JEONNAM_PRESS_RELEASE_FEED = "https://www.jeonnam.go.kr/M7116/boardRss.do"
 
 
 @dataclass
@@ -57,6 +61,191 @@ class _MoisArticleInfoParser(HTMLParser):
     def handle_data(self, data):
         if self.depth:
             self.parts.append(data)
+
+
+class _KoglLicenseParser(HTMLParser):
+    """Read only explicit KOGL license labels linked to the official license site."""
+
+    def __init__(self):
+        super().__init__()
+        self.anchor_depth = 0
+        self.collect_anchor = False
+        self.anchor_text = []
+        self.license_types: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "a":
+            self.anchor_depth += 1
+            try:
+                host = urlsplit(attributes.get("href", "")).hostname
+            except ValueError:
+                host = None
+            self.collect_anchor = host in {"kogl.or.kr", "www.kogl.or.kr"}
+            self.anchor_text = []
+        elif self.anchor_depth and self.collect_anchor and tag == "img":
+            self.anchor_text.append(attributes.get("alt", ""))
+
+    def handle_data(self, data):
+        if self.anchor_depth and self.collect_anchor:
+            self.anchor_text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self.anchor_depth:
+            if self.collect_anchor:
+                text = " ".join(self.anchor_text)
+                self.license_types.extend(
+                    re.findall(r"(?:공공누리\s*(?:제\s*)?|제)\s*([1-4])\s*유형", text)
+                )
+            self.anchor_depth -= 1
+            self.collect_anchor = False
+            self.anchor_text = []
+
+
+def parse_mods_kogl_type(html: str) -> str | None:
+    parser = _KoglLicenseParser()
+    parser.feed(html)
+    types = set(parser.license_types)
+    # Missing or conflicting license labels are never treated as permission.
+    return next(iter(types)) if len(types) == 1 else None
+
+
+def _is_mods_article_url(article_url: str) -> bool:
+    try:
+        parts = urlsplit(article_url)
+        query = parse_qs(parts.query)
+        port_is_safe = parts.port in (None, 443)
+    except ValueError:
+        return False
+    return bool(
+        parts.scheme == "https"
+        and parts.hostname == "mods.go.kr"
+        and port_is_safe
+        and not parts.username
+        and not parts.password
+        and parts.path == "/board.es"
+        and len(query.get("mid", [])) == 1
+        and re.fullmatch(r"a10301\d{6}", query["mid"][0]) is not None
+        and query.get("act") == ["view"]
+        and len(query.get("bid", [])) == 1
+        and query["bid"][0].isdigit()
+        and len(query.get("list_no", [])) == 1
+        and query["list_no"][0].isdigit()
+    )
+
+
+def fetch_mods_kogl_type(client: httpx.Client, article_url: str) -> str | None:
+    if not _is_mods_article_url(article_url):
+        return None
+    try:
+        with client.stream("GET", article_url, headers={"Accept": "text/html"}) as response:
+            if response.status_code != 200:
+                return None
+            content = bytearray()
+            for chunk in response.iter_bytes():
+                content.extend(chunk)
+                if len(content) > 512 * 1024:
+                    return None
+        return parse_mods_kogl_type(content.decode("utf-8", errors="replace"))
+    except httpx.HTTPError:
+        return None
+
+
+def _is_gyeonggi_article_url(article_url: str) -> bool:
+    try:
+        parts = urlsplit(article_url)
+        query = parse_qs(parts.query)
+        port_is_safe = parts.port in (None, 443)
+    except ValueError:
+        return False
+    return bool(
+        parts.scheme == "https"
+        and parts.hostname == "gnews.gg.go.kr"
+        and port_is_safe
+        and not parts.username
+        and not parts.password
+        and parts.path == "/briefing/brief_gongbo_view.do"
+        and len(query.get("BS_CODE", [])) == 1
+        and re.fullmatch(r"S\d{3}", query["BS_CODE"][0]) is not None
+        and len(query.get("number", [])) == 1
+        and query["number"][0].isdigit()
+    )
+
+
+def fetch_gyeonggi_kogl_type(client: httpx.Client, article_url: str) -> str | None:
+    if not _is_gyeonggi_article_url(article_url):
+        return None
+    try:
+        with client.stream("GET", article_url, headers={"Accept": "text/html"}) as response:
+            if response.status_code != 200:
+                return None
+            content = bytearray()
+            for chunk in response.iter_bytes():
+                content.extend(chunk)
+                if len(content) > 512 * 1024:
+                    return None
+        return parse_mods_kogl_type(content.decode("utf-8", errors="replace"))
+    except httpx.HTTPError:
+        return None
+
+
+def _is_daegu_article_url(article_url: str) -> bool:
+    try:
+        parts = urlsplit(article_url)
+        query = parse_qs(parts.query)
+        port_is_safe = parts.port in (None, 443)
+    except ValueError:
+        return False
+    return bool(
+        parts.scheme == "https"
+        and parts.hostname == "info.daegu.go.kr"
+        and port_is_safe
+        and not parts.username
+        and not parts.password
+        and parts.path == "/newshome/mtnmain.php"
+        and query.get("mtnkey") == ["articleview"]
+        and len(query.get("aid", [])) == 1
+        and query["aid"][0].isdigit()
+    )
+
+
+def _normalize_jeonnam_article_url(article_url: str) -> str | None:
+    try:
+        parts = urlsplit(article_url)
+        query = parse_qs(parts.query)
+        port_is_safe = parts.port in (None, 80) if parts.scheme == "http" else parts.port in (None, 443)
+    except ValueError:
+        return None
+    if not (
+        parts.scheme in {"http", "https"}
+        and parts.hostname == "www.jeonnam.go.kr"
+        and port_is_safe
+        and not parts.username
+        and not parts.password
+        and parts.path == "/M7116/boardView.do"
+        and len(query.get("seq", [])) == 1
+        and query["seq"][0].isdigit()
+        and query.get("menuId") == ["jeonnam0202000000"]
+    ):
+        return None
+    return urlunsplit(("https", parts.netloc, parts.path, parts.query, ""))
+
+
+def _fetch_kogl_type_for_validated_url(
+    client: httpx.Client, article_url: str
+) -> str | None:
+    try:
+        with client.stream("GET", article_url, headers={"Accept": "text/html"}) as response:
+            if response.status_code != 200:
+                return None
+            content = bytearray()
+            for chunk in response.iter_bytes():
+                content.extend(chunk)
+                if len(content) > 512 * 1024:
+                    return None
+        return parse_mods_kogl_type(content.decode("utf-8", errors="replace"))
+    except httpx.HTTPError:
+        return None
 
 
 def parse_mois_published_date(html: str) -> datetime | None:
@@ -169,13 +358,13 @@ class DemoSourceAdapter:
 class RSSSourceAdapter:
     max_bytes = 2 * 1024 * 1024
 
-    def fetch(self, source: Source) -> FetchResult:
+    def fetch(self, source: Source, *, follow_redirects: bool = True) -> FetchResult:
         headers = {"User-Agent": "IssueAreaCollector/0.1 (metadata only)"}
         if source.etag:
             headers["If-None-Match"] = source.etag
         if source.last_modified:
             headers["If-Modified-Since"] = source.last_modified
-        with httpx.Client(timeout=15, follow_redirects=True, max_redirects=3) as client:
+        with httpx.Client(timeout=15, follow_redirects=follow_redirects, max_redirects=3) as client:
             with client.stream("GET", source.feed_url, headers=headers) as response:
                 if response.status_code == 304:
                     return FetchResult([], 304)
@@ -209,3 +398,91 @@ class RSSSourceAdapter:
                     response.headers.get("etag"),
                     response.headers.get("last-modified"),
                 )
+
+
+class ModsPressReleaseAdapter:
+    """Collect MODS press release metadata only when its page explicitly shows KOGL 1."""
+
+    max_article_checks = 50
+
+    def fetch(self, source: Source) -> FetchResult:
+        if source.feed_url != MODS_PRESS_RELEASE_FEED:
+            raise ValueError("MODS adapter requires the official press release feed")
+        result = RSSSourceAdapter().fetch(source, follow_redirects=False)
+        if result.status == 304:
+            return result
+        eligible = []
+        with httpx.Client(
+            timeout=10,
+            follow_redirects=False,
+            headers={"User-Agent": "IssueAreaCollector/0.1 (metadata only)"},
+        ) as client:
+            for entry in result.entries[: self.max_article_checks]:
+                license_type = fetch_mods_kogl_type(client, entry.url)
+                if license_type == "1":
+                    entry.external_id = entry.external_id or entry.url
+                    eligible.append(entry)
+                elif license_type in {"2", "3", "4"}:
+                    # A changed explicit license revokes this item's previous eligibility.
+                    entry.action = "delete"
+                    entry.external_id = entry.external_id or entry.url
+                    eligible.append(entry)
+        return FetchResult(eligible, result.status, result.etag, result.last_modified)
+
+
+class KoglPressReleaseAdapter:
+    """Collect metadata only when a validated official article page shows KOGL 1."""
+
+    feed_url: str
+    max_article_checks = 50
+
+    def secure_article_url(self, article_url: str) -> str | None:
+        raise NotImplementedError
+
+    def fetch(self, source: Source) -> FetchResult:
+        if source.feed_url != self.feed_url:
+            raise ValueError("Source adapter requires its registered official feed")
+        result = RSSSourceAdapter().fetch(source, follow_redirects=False)
+        if result.status == 304:
+            return result
+        eligible = []
+        with httpx.Client(
+            timeout=10,
+            follow_redirects=False,
+            headers={"User-Agent": "IssueAreaCollector/0.1 (metadata only)"},
+        ) as client:
+            for entry in result.entries[: self.max_article_checks]:
+                safe_url = self.secure_article_url(entry.url)
+                if not safe_url:
+                    continue
+                entry.url = safe_url
+                license_type = _fetch_kogl_type_for_validated_url(client, safe_url)
+                if license_type == "1":
+                    entry.external_id = entry.external_id or entry.url
+                    eligible.append(entry)
+                elif license_type in {"2", "3", "4"}:
+                    entry.action = "delete"
+                    entry.external_id = entry.external_id or entry.url
+                    eligible.append(entry)
+        return FetchResult(eligible, result.status, result.etag, result.last_modified)
+
+
+class GyeonggiPressReleaseAdapter(KoglPressReleaseAdapter):
+    feed_url = GYEONGGI_PRESS_RELEASE_FEED
+
+    def secure_article_url(self, article_url: str) -> str | None:
+        return article_url if _is_gyeonggi_article_url(article_url) else None
+
+
+class DaeguPressReleaseAdapter(KoglPressReleaseAdapter):
+    feed_url = DAEGU_NEWS_FEED
+
+    def secure_article_url(self, article_url: str) -> str | None:
+        return article_url if _is_daegu_article_url(article_url) else None
+
+
+class JeonnamPressReleaseAdapter(KoglPressReleaseAdapter):
+    feed_url = JEONNAM_PRESS_RELEASE_FEED
+
+    def secure_article_url(self, article_url: str) -> str | None:
+        return _normalize_jeonnam_article_url(article_url)

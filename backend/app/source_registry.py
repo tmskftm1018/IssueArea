@@ -13,8 +13,14 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.db import SessionLocal, utcnow
-from app.models import CollectionRun, Source
+from app.models import Article, CollectionRun, Source
 from app.services import can_collect, canonical_url
+from app.sources import (
+    DAEGU_NEWS_FEED,
+    GYEONGGI_PRESS_RELEASE_FEED,
+    JEONNAM_PRESS_RELEASE_FEED,
+    MODS_PRESS_RELEASE_FEED,
+)
 
 
 def validate_registry_url(url: str) -> str:
@@ -67,8 +73,48 @@ def add_source(
         raise ValueError("Collection interval must be between 1 and 1440 minutes")
     feed_url = validate_registry_url(feed_url)
     terms_url = validate_registry_url(terms_url)
-    if adapter not in {"rss", "rss_press_release", "newswire", "newsdata"}:
+    supported_adapters = {
+        "rss",
+        "rss_press_release",
+        "mods_press_release",
+        "gyeonggi_press_release",
+        "daegu_press_release",
+        "jeonnam_press_release",
+        "newswire",
+        "newsdata",
+    }
+    if adapter not in supported_adapters:
         raise ValueError("Unsupported source adapter")
+    if adapter == "mods_press_release":
+        if feed_url != MODS_PRESS_RELEASE_FEED or interval < 30:
+            raise ValueError(
+                "MODS press releases require the official feed and at least 30 minutes"
+            )
+        if session.scalar(select(Source.id).where(Source.adapter_type == "mods_press_release")):
+            raise ValueError("Only one MODS press release source can be registered")
+    if adapter == "gyeonggi_press_release":
+        if feed_url != GYEONGGI_PRESS_RELEASE_FEED or interval < 30:
+            raise ValueError(
+                "Gyeonggi press releases require the official feed and at least 30 minutes"
+            )
+        if session.scalar(
+            select(Source.id).where(Source.adapter_type == "gyeonggi_press_release")
+        ):
+            raise ValueError("Only one Gyeonggi press release source can be registered")
+    if adapter == "daegu_press_release":
+        if feed_url != DAEGU_NEWS_FEED or interval < 30:
+            raise ValueError("Daegu news requires the official feed and at least 30 minutes")
+        if session.scalar(select(Source.id).where(Source.adapter_type == "daegu_press_release")):
+            raise ValueError("Only one Daegu news source can be registered")
+    if adapter == "jeonnam_press_release":
+        if feed_url != JEONNAM_PRESS_RELEASE_FEED or interval < 30:
+            raise ValueError(
+                "Jeonnam press releases require the official feed and at least 30 minutes"
+            )
+        if session.scalar(
+            select(Source.id).where(Source.adapter_type == "jeonnam_press_release")
+        ):
+            raise ValueError("Only one Jeonnam press release source can be registered")
     if adapter == "newsdata":
         if feed_url != "https://newsdata.io/api/1/latest" or interval < 10:
             raise ValueError("NewsData requires the official endpoint and at least 10 minutes")
@@ -81,7 +127,59 @@ def add_source(
             )
         if session.scalar(select(Source.id).where(Source.adapter_type == "newswire")):
             raise ValueError("Only one Newswire partner source can use this account")
-    if session.scalar(select(Source.id).where(Source.feed_url == feed_url)):
+    existing = session.scalar(select(Source).where(Source.feed_url == feed_url))
+    if existing:
+        # Safely upgrade the seeded, unreviewed MODS placeholder without creating a
+        # duplicate feed. Never rewrite an active or previously collected source.
+        if (
+            adapter == "mods_press_release"
+            and existing.adapter_type == "rss_press_release"
+            and not existing.enabled
+            and existing.rights_status == "unreviewed"
+            and not session.scalar(
+                select(CollectionRun.id).where(CollectionRun.source_id == existing.id)
+            )
+            and not session.scalar(select(Article.id).where(Article.source_id == existing.id))
+        ):
+            existing.name = name
+            existing.adapter_type = adapter
+            existing.collection_interval_minutes = interval
+            session.commit()
+            return existing
+        if (
+            adapter == "gyeonggi_press_release"
+            and existing.adapter_type == "rss_press_release"
+            and not existing.enabled
+            and existing.rights_status == "unreviewed"
+            and not session.scalar(
+                select(CollectionRun.id).where(CollectionRun.source_id == existing.id)
+            )
+            and not session.scalar(select(Article.id).where(Article.source_id == existing.id))
+        ):
+            existing.name = name
+            existing.adapter_type = adapter
+            existing.collection_interval_minutes = interval
+            session.commit()
+            return existing
+        adapter_to_placeholder = {
+            "daegu_press_release": "rss_press_release",
+            "jeonnam_press_release": "rss_press_release",
+        }
+        if (
+            adapter in adapter_to_placeholder
+            and existing.adapter_type == adapter_to_placeholder[adapter]
+            and not existing.enabled
+            and existing.rights_status == "unreviewed"
+            and not session.scalar(
+                select(CollectionRun.id).where(CollectionRun.source_id == existing.id)
+            )
+            and not session.scalar(select(Article.id).where(Article.source_id == existing.id))
+        ):
+            existing.name = name
+            existing.adapter_type = adapter
+            existing.collection_interval_minutes = interval
+            session.commit()
+            return existing
         raise ValueError("This feed URL is already registered")
     source = Source(
         name=name,
@@ -122,7 +220,17 @@ def set_enabled(session, source_id: int, enabled: bool):
         raise ValueError("Demo activation is controlled by DEMO_MODE")
     if enabled:
         if (
-            source.adapter_type not in {"rss", "rss_press_release", "newswire", "newsdata"}
+            source.adapter_type
+            not in {
+                "rss",
+                "rss_press_release",
+                "mods_press_release",
+                "gyeonggi_press_release",
+                "daegu_press_release",
+                "jeonnam_press_release",
+                "newswire",
+                "newsdata",
+            }
             or not source.terms_checked_at
             or not source.notes
         ):
@@ -137,6 +245,27 @@ def set_enabled(session, source_id: int, enabled: bool):
                 raise ValueError("Invalid free NewsData source configuration")
             if not settings.newsdata_api_key:
                 raise ValueError("NewsData API key must be configured before activation")
+        if source.adapter_type == "mods_press_release":
+            if (
+                source.feed_url != MODS_PRESS_RELEASE_FEED
+                or source.collection_interval_minutes < 30
+            ):
+                raise ValueError("Invalid MODS press release source configuration")
+        if source.adapter_type == "gyeonggi_press_release":
+            if (
+                source.feed_url != GYEONGGI_PRESS_RELEASE_FEED
+                or source.collection_interval_minutes < 30
+            ):
+                raise ValueError("Invalid Gyeonggi press release source configuration")
+        if source.adapter_type == "daegu_press_release":
+            if source.feed_url != DAEGU_NEWS_FEED or source.collection_interval_minutes < 30:
+                raise ValueError("Invalid Daegu news source configuration")
+        if source.adapter_type == "jeonnam_press_release":
+            if (
+                source.feed_url != JEONNAM_PRESS_RELEASE_FEED
+                or source.collection_interval_minutes < 30
+            ):
+                raise ValueError("Invalid Jeonnam press release source configuration")
         if source.adapter_type == "newswire":
             if source.feed_url != "https://www.newswire.co.kr/api/v1/request":
                 raise ValueError("Newswire requires the official endpoint")
@@ -206,7 +335,16 @@ def main(argv=None):
     add.add_argument("--interval", type=int, default=5)
     add.add_argument(
         "--adapter",
-        choices=["rss", "rss_press_release", "newswire", "newsdata"],
+        choices=[
+            "rss",
+            "rss_press_release",
+            "mods_press_release",
+            "gyeonggi_press_release",
+            "daegu_press_release",
+            "jeonnam_press_release",
+            "newswire",
+            "newsdata",
+        ],
         default="rss",
     )
     review = sub.add_parser("review")

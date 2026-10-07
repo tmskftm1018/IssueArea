@@ -15,8 +15,13 @@ from app.newsdata import FreeQuotaExceeded, NewsDataSourceAdapter
 from app.newswire import NewswireSourceAdapter
 from app.services import can_collect, canonical_url, clean_title, title_hash
 from app.sources import (
+    MODS_PRESS_RELEASE_FEED,
     MOIS_PRESS_RELEASE_FEED,
     DemoSourceAdapter,
+    DaeguPressReleaseAdapter,
+    GyeonggiPressReleaseAdapter,
+    JeonnamPressReleaseAdapter,
+    ModsPressReleaseAdapter,
     RSSSourceAdapter,
     fetch_mois_published_date,
 )
@@ -33,7 +38,7 @@ def _as_utc(value):
 def _geo_scope(source, title, region_ids):
     if region_ids:
         return "regional"
-    if source.feed_url == MOIS_PRESS_RELEASE_FEED or "전국" in title:
+    if source.feed_url in {MOIS_PRESS_RELEASE_FEED, MODS_PRESS_RELEASE_FEED} or "전국" in title:
         return "national"
     return "unknown"
 
@@ -43,7 +48,18 @@ def collect_source(session, source, adapter=None):
         raise PermissionError("Source is disabled or does not have permitted usage rights")
     if source.adapter_type == "demo" and not settings.demo_mode:
         raise PermissionError("Demo mode is disabled")
-    if source.adapter_type not in {"demo", "rss", "rss_press_release", "newswire", "newsdata"}:
+    supported_adapters = {
+        "demo",
+        "rss",
+        "rss_press_release",
+        "mods_press_release",
+        "gyeonggi_press_release",
+        "daegu_press_release",
+        "jeonnam_press_release",
+        "newswire",
+        "newsdata",
+    }
+    if source.adapter_type not in supported_adapters:
         raise ValueError("Unsupported source adapter")
     if source.adapter_type == "newsdata":
         attempts = session.scalar(
@@ -84,6 +100,10 @@ def collect_source(session, source, adapter=None):
             "demo": DemoSourceAdapter,
             "rss": RSSSourceAdapter,
             "rss_press_release": RSSSourceAdapter,
+            "mods_press_release": ModsPressReleaseAdapter,
+            "gyeonggi_press_release": GyeonggiPressReleaseAdapter,
+            "daegu_press_release": DaeguPressReleaseAdapter,
+            "jeonnam_press_release": JeonnamPressReleaseAdapter,
             "newswire": NewswireSourceAdapter,
             "newsdata": NewsDataSourceAdapter,
         }
@@ -105,7 +125,13 @@ def collect_source(session, source, adapter=None):
                     if entry.external_id
                     else None
                 )
-                if entry.action != "insert" and source.adapter_type != "newswire":
+                if entry.action != "insert" and source.adapter_type not in {
+                    "newswire",
+                    "mods_press_release",
+                    "gyeonggi_press_release",
+                    "daegu_press_release",
+                    "jeonnam_press_release",
+                }:
                     raise ValueError("Update/delete events require a supported partner source")
                 if entry.action == "delete":
                     if existing:

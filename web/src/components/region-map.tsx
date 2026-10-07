@@ -1,12 +1,26 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import type { Region } from "@/lib/types";
+import type { Region, SubregionCollection } from "@/lib/types";
 
-export default function RegionMap({ regions, selected, onSelect }: { regions: Region[]; selected: string; onSelect: (code: string) => void }) {
+function subregionStyle(feature: GeoJSON.Feature | undefined, selectedLocality: string): L.PathOptions {
+  const selected = feature?.properties?.name === selectedLocality;
+  return {
+    color: selected ? "#125841" : "#447b68",
+    weight: 1.5,
+    opacity: 0.9,
+    fillColor: selected ? "#55a883" : "#91c9ad",
+    fillOpacity: 0.28,
+  };
+}
+
+export default function RegionMap({ regions, selected, onSelect, subregions, selectedLocality, onSelectLocality }: { regions: Region[]; selected: string; onSelect: (code: string) => void; subregions: SubregionCollection | null; selectedLocality: string; onSelectLocality: (name: string) => void }) {
   const element = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<L.LayerGroup | null>(null);
+  const boundaries = useRef<L.GeoJSON | null>(null);
+  const selectedLocalityRef = useRef(selectedLocality);
+  const onSelectLocalityRef = useRef(onSelectLocality);
   const [error, setError] = useState(false);
   useEffect(() => {
     if (!element.current) return;
@@ -20,6 +34,38 @@ export default function RegionMap({ regions, selected, onSelect }: { regions: Re
     observer.observe(element.current);
     return () => { observer.disconnect(); instance.remove(); map.current = null; markers.current = null; };
   }, []);
+  useEffect(() => {
+    selectedLocalityRef.current = selectedLocality;
+    onSelectLocalityRef.current = onSelectLocality;
+    boundaries.current?.setStyle(feature => subregionStyle(feature, selectedLocality));
+  }, [selectedLocality, onSelectLocality]);
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    boundaries.current?.remove();
+    boundaries.current = null;
+    if (!subregions) return;
+    const layer = L.geoJSON(subregions as GeoJSON.GeoJsonObject, {
+      style: feature => subregionStyle(feature, selectedLocalityRef.current),
+      onEachFeature: (feature, polygon) => {
+        const props = feature.properties as { name?: string; count?: number };
+        if (props.name) {
+          const tooltip = document.createElement("span");
+          tooltip.textContent = `${props.name} · ${props.count ?? 0}건`;
+          polygon.bindTooltip(tooltip, { sticky: true });
+          polygon.on("click", () => {
+            onSelectLocalityRef.current(props.name!);
+            const center = (polygon as L.Polygon).getBounds().getCenter();
+            instance.panTo(center, { animate: true, duration: 0.35 });
+          });
+        }
+      },
+    }).addTo(instance);
+    boundaries.current = layer;
+    const bounds = layer.getBounds();
+    if (bounds.isValid()) instance.fitBounds(bounds, { padding: [20, 20], maxZoom: 11 });
+    return () => { layer.remove(); if (boundaries.current === layer) boundaries.current = null; };
+  }, [subregions]);
   useEffect(() => {
     const instance = map.current;
     const markerLayer = markers.current;

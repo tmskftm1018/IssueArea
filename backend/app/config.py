@@ -16,8 +16,16 @@ class Settings(BaseSettings):
     newswire_partner_id: int | None = Field(default=None, gt=0)
     newswire_api_key: SecretStr | None = None
     newsdata_api_key: SecretStr | None = None
+    vworld_api_key: SecretStr | None = None
+    vworld_domain: str = "http://localhost:3000"
 
-    @field_validator("newswire_partner_id", "newswire_api_key", "newsdata_api_key", mode="before")
+    @field_validator(
+        "newswire_partner_id",
+        "newswire_api_key",
+        "newsdata_api_key",
+        "vworld_api_key",
+        mode="before",
+    )
     @classmethod
     def empty_optional_credentials(cls, value):
         return None if value == "" else value

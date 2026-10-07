@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
@@ -13,6 +13,7 @@ from app.models import Article, ArticleRegion, ArticleTopic, CollectionRun, Regi
 from app.safety import check_startup
 from app.services import can_collect
 from app.sources import MOIS_PRESS_RELEASE_FEED
+from app.vworld import VWorldError, get_sigungu_boundaries
 
 
 @asynccontextmanager
@@ -32,7 +33,7 @@ app.add_middleware(
 DB = Annotated[Session, Depends(get_session)]
 
 
-def filtered(session, hours, topics, q, region=None):
+def filtered(session, hours, topics, q, region=None, locality=None):
     if hours not in {1, 6, 24, 168}:
         raise HTTPException(422, "hours must be one of 1, 6, 24, 168")
     now = utcnow()
@@ -94,6 +95,10 @@ def filtered(session, hours, topics, q, region=None):
                 select(ArticleRegion.article_id).where(ArticleRegion.region_id == region_id)
             )
         )
+    if locality:
+        if not region or len(locality) < 2 or len(locality) > 40:
+            raise HTTPException(422, "locality requires a valid region and a 2–40 character name")
+        query = query.where(locality_title_match(Article.title, locality, region))
     return query
 
 
@@ -101,6 +106,27 @@ def iso(value):
     if value is None:
         return None
     return value.replace(tzinfo=UTC).isoformat() if value.tzinfo is None else value.isoformat()
+
+
+LOCALITY_TITLE_ALIASES = {"KR-11": {"용산구": ("이태원", "이태원참사")}}
+
+
+def locality_title_terms(locality: str, region: str | None = None) -> tuple[str, ...]:
+    """Return full and commonly shortened names used in Korean headlines."""
+    parts = locality.split()
+    leaf = parts[-1]
+    terms = {locality, leaf}
+    for suffix in ("시", "군", "구"):
+        if leaf.endswith(suffix) and len(leaf) > 1:
+            terms.add(leaf[:-1])
+    terms.update(LOCALITY_TITLE_ALIASES.get(region or "", {}).get(locality, ()))
+    return tuple(sorted(terms))
+
+
+def locality_title_match(column, locality: str, region: str | None = None):
+    return or_(
+        *(column.contains(term, autoescape=True) for term in locality_title_terms(locality, region))
+    )
 
 
 @app.get("/health")
@@ -135,10 +161,11 @@ def news(
     topics: str = Query(default="", max_length=300),
     q: str = Query(default="", max_length=200),
     region: str | None = None,
+    locality: str | None = Query(default=None, max_length=40),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
-    query = filtered(session, hours, topics, q, region)
+    query = filtered(session, hours, topics, q, region, locality)
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     articles = session.scalars(
         query.options(
@@ -162,7 +189,15 @@ def news(
                 "title": a.title,
                 "source": a.publisher_name or a.source.name,
                 "content_type": "press_release"
-                if a.source.adapter_type in {"newswire", "rss_press_release"}
+                if a.source.adapter_type
+                in {
+                    "newswire",
+                    "rss_press_release",
+                    "mods_press_release",
+                    "gyeonggi_press_release",
+                    "daegu_press_release",
+                    "jeonnam_press_release",
+                }
                 else "news",
                 "url": a.original_url,
                 "published_at": iso(a.published_at),
@@ -209,6 +244,68 @@ def map_regions(
         ],
         "unmapped_count": unmapped,
     }
+
+
+REGION_SIGUNGU_PREFIXES = {
+    # VWorld's current SIG_CD values reflect the latest special self-governing
+    # province and integrated city codes (51, 52, and 12 respectively).
+    "KR-11": ("11",),
+    "KR-26": ("26",),
+    "KR-27": ("27",),
+    "KR-28": ("28",),
+    "KR-29": ("12",),  # Gwangju–Jeonnam integrated area
+    "KR-30": ("30",),
+    "KR-31": ("31",),
+    "KR-50": ("36",),
+    "KR-41": ("41",),
+    "KR-51": ("51",),
+    "KR-43": ("43",),
+    "KR-44": ("44",),
+    "KR-52": ("52",),
+    "KR-47": ("47",),
+    "KR-48": ("48",),
+    "KR-49": ("50",),
+}
+
+
+@app.get("/api/v1/map/subregions")
+def map_subregions(
+    session: DB,
+    region: str,
+    hours: int = 24,
+    topics: str = Query(default="", max_length=300),
+    q: str = Query(default="", max_length=200),
+):
+    prefixes = REGION_SIGUNGU_PREFIXES.get(region)
+    if not prefixes:
+        raise HTTPException(422, "Unknown region")
+    try:
+        collection = get_sigungu_boundaries()
+    except VWorldError as exc:
+        detail = "시군구 경계를 불러오지 못했습니다. API 키와 도메인 설정을 확인해 주세요."
+        raise HTTPException(502, detail) from exc
+
+    features = []
+    matched = filtered(session, hours, topics, q, region).subquery()
+    for feature in collection["features"]:
+        props = feature.get("properties") or {}
+        code = str(props.get("sig_cd") or "")
+        name = str(props.get("sig_kor_nm") or "").strip()
+        if not name or not any(code.startswith(prefix) for prefix in prefixes):
+            continue
+        count = session.scalar(
+            select(func.count(func.distinct(matched.c.id))).where(
+                locality_title_match(matched.c.title, name, region)
+            )
+        ) or 0
+        features.append({
+            "type": "Feature",
+            "geometry": feature.get("geometry"),
+            "properties": {"code": code, "name": name, "count": count},
+        })
+    if not features:
+        raise HTTPException(502, "시군구 경계 응답이 비어 있습니다.")
+    return {"type": "FeatureCollection", "features": features}
 
 
 @app.get("/api/v1/system/freshness")

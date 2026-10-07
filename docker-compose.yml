@@ -25,6 +25,8 @@ services:
       NEWSWIRE_PARTNER_ID: ${NEWSWIRE_PARTNER_ID:-}
       NEWSWIRE_API_KEY: ${NEWSWIRE_API_KEY:-}
       NEWSDATA_API_KEY: ${NEWSDATA_API_KEY:-}
+      VWORLD_API_KEY: ${VWORLD_API_KEY:-}
+      VWORLD_DOMAIN: ${VWORLD_DOMAIN:-http://localhost:3000}
     command: [sh, -c, 'alembic upgrade head && python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000']
     ports: ['8000:8000']
     depends_on:

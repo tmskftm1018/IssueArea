@@ -6,6 +6,21 @@ const regions = [
   { code: "KR-26", name: "부산광역시", short_name: "부산", latitude: 35.1796, longitude: 129.0756, count: 1 },
 ];
 const topics = [{ slug: "politics", name: "정치" }, { slug: "economy", name: "경제" }];
+const seoulSubregions = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      properties: { code: "11680", name: "강남구", count: 1 },
+      geometry: { type: "Polygon", coordinates: [[[127.02, 37.49], [127.08, 37.49], [127.08, 37.54], [127.02, 37.54], [127.02, 37.49]]] },
+    },
+    {
+      type: "Feature",
+      properties: { code: "11110", name: "종로구", count: 0 },
+      geometry: { type: "Polygon", coordinates: [[[126.96, 37.56], [127.00, 37.56], [127.00, 37.60], [126.96, 37.60], [126.96, 37.56]]] },
+    },
+  ],
+};
 const articles = [
   { id: 1, title: "서울 반도체 산업 지원 발표", source: "IssueArea 테스트 뉴스", content_type: "news", url: "https://news.example.test/seoul", published_at: "2026-09-30T02:00:00Z", collected_at: "2026-09-30T02:05:00Z", geo_scope: "regional", regions: [{ code: "KR-11", name: "서울특별시" }], topics: [{ slug: "economy", name: "경제" }] },
   { id: 2, title: "인천 교통 정책 발표", source: "IssueArea 테스트 뉴스", content_type: "press_release", url: "https://news.example.test/incheon", published_at: "2026-09-30T01:00:00Z", collected_at: "2026-09-30T01:05:00Z", geo_scope: "regional", regions: [{ code: "KR-28", name: "인천광역시" }], topics: [{ slug: "politics", name: "정치" }] },
@@ -35,6 +50,8 @@ async function mockApi(page: Page, options: { failNewsUntilRetry?: boolean; dela
       await route.fulfill({ json: { items: items.slice((pageNumber - 1) * pageSize, pageNumber * pageSize), total: items.length, page: pageNumber, page_size: pageSize } });
     } else if (url.pathname.endsWith("/map/regions")) {
       await route.fulfill({ json: { regions, unmapped_count: 1 } });
+    } else if (url.pathname.endsWith("/map/subregions")) {
+      await route.fulfill({ json: seoulSubregions });
     } else if (url.pathname.endsWith("/topics")) {
       await route.fulfill({ json: topics });
     } else if (url.pathname.endsWith("/system/freshness")) {
@@ -79,6 +96,34 @@ test("지역 클러스터를 누르면 지도가 확대되어 개별 지역 마�
   await expect(cluster).toBeVisible();
   await cluster.click();
   await expect(page.getByRole("button", { name: /서울특별시 2건 선택/ })).toBeVisible();
+});
+
+test("시군구 경계를 누르면 지역 필터가 적용되고 지도가 해당 지역 중심으로 이동한다", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: /개 지역 묶음, 눌러서 확대/ }).first().click();
+  const seoulMarker = page.getByRole("button", { name: "서울특별시 2건 선택" });
+  await expect(seoulMarker).toBeVisible();
+  await seoulMarker.click();
+  await expect(page).toHaveURL(/region=KR-11/);
+  await expect(page.getByRole("button", { name: "시도 지도 보기 ↑" })).toBeVisible();
+
+  const neighborhood = page.locator("path.leaflet-interactive").first();
+  await expect(neighborhood).toBeVisible();
+  await neighborhood.click();
+  await expect(page).toHaveURL(/locality=%EA%B0%95%EB%82%A8%EA%B5%AC/);
+
+  await expect.poll(async () => neighborhood.evaluate(path => {
+    const map = path.closest(".leaflet-container");
+    if (!map) return Infinity;
+    const shape = path.getBoundingClientRect();
+    const viewport = map.getBoundingClientRect();
+    return Math.hypot(
+      (shape.left + shape.right) / 2 - (viewport.left + viewport.right) / 2,
+      (shape.top + shape.bottom) / 2 - (viewport.top + viewport.bottom) / 2,
+    );
+  })).toBeLessThan(35);
+  await expect.poll(() => neighborhood.evaluate(path => getComputedStyle(path).outlineStyle)).toBe("none");
 });
 
 test("일시적 API 오류를 다시 시도하면 뉴스 목록을 복구한다", async ({ page }) => {
