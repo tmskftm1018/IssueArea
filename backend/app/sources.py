@@ -11,6 +11,7 @@ import feedparser
 import httpx
 
 from app.catalog import REGIONS, TOPICS
+from app.config import settings
 from app.db import utcnow
 from app.models import Source
 
@@ -19,6 +20,9 @@ MODS_PRESS_RELEASE_FEED = "https://mods.go.kr/board.es?mid=a10301010000&bid=a103
 GYEONGGI_PRESS_RELEASE_FEED = "https://gnews.gg.go.kr/rss/gnewsRssBodo.do"
 DAEGU_NEWS_FEED = "https://info.daegu.go.kr/rss/rss.php?sgidx=1"
 JEONNAM_PRESS_RELEASE_FEED = "https://www.jeonnam.go.kr/M7116/boardRss.do"
+GANGNAM_PRESS_RELEASE_FEED = (
+    "https://www.gangnam.go.kr/portal/rss/rssList.do?bbsId=B_000031&recordCountPerPage=10"
+)
 
 
 @dataclass
@@ -209,11 +213,30 @@ def _is_daegu_article_url(article_url: str) -> bool:
     )
 
 
+def _is_gangnam_article_url(article_url: str) -> bool:
+    try:
+        parts = urlsplit(article_url)
+        port_is_safe = parts.port in (None, 443)
+    except ValueError:
+        return False
+    return bool(
+        parts.scheme == "https"
+        and parts.hostname in {"gangnam.go.kr", "www.gangnam.go.kr"}
+        and port_is_safe
+        and not parts.username
+        and not parts.password
+        and re.fullmatch(r"/board/B_000031/\d+/view\.do", parts.path) is not None
+    )
+
+
 def _normalize_jeonnam_article_url(article_url: str) -> str | None:
     try:
         parts = urlsplit(article_url)
         query = parse_qs(parts.query)
-        port_is_safe = parts.port in (None, 80) if parts.scheme == "http" else parts.port in (None, 443)
+        if parts.scheme == "http":
+            port_is_safe = parts.port in (None, 80)
+        else:
+            port_is_safe = parts.port in (None, 443)
     except ValueError:
         return None
     if not (
@@ -231,9 +254,7 @@ def _normalize_jeonnam_article_url(article_url: str) -> str | None:
     return urlunsplit(("https", parts.netloc, parts.path, parts.query, ""))
 
 
-def _fetch_kogl_type_for_validated_url(
-    client: httpx.Client, article_url: str
-) -> str | None:
+def _fetch_kogl_type_for_validated_url(client: httpx.Client, article_url: str) -> str | None:
     try:
         with client.stream("GET", article_url, headers={"Accept": "text/html"}) as response:
             if response.status_code != 200:
@@ -435,9 +456,13 @@ class KoglPressReleaseAdapter:
 
     feed_url: str
     max_article_checks = 50
+    date_only_publication = False
 
     def secure_article_url(self, article_url: str) -> str | None:
         raise NotImplementedError
+
+    def allowed_license_types(self, source: Source) -> set[str]:
+        return {"1"}
 
     def fetch(self, source: Source) -> FetchResult:
         if source.feed_url != self.feed_url:
@@ -445,7 +470,11 @@ class KoglPressReleaseAdapter:
         result = RSSSourceAdapter().fetch(source, follow_redirects=False)
         if result.status == 304:
             return result
+        for entry in result.entries:
+            if self.date_only_publication and entry.published_at:
+                entry.published_precision = "date"
         eligible = []
+        allowed_types = self.allowed_license_types(source)
         with httpx.Client(
             timeout=10,
             follow_redirects=False,
@@ -457,7 +486,7 @@ class KoglPressReleaseAdapter:
                     continue
                 entry.url = safe_url
                 license_type = _fetch_kogl_type_for_validated_url(client, safe_url)
-                if license_type == "1":
+                if license_type in allowed_types:
                     entry.external_id = entry.external_id or entry.url
                     eligible.append(entry)
                 elif license_type in {"2", "3", "4"}:
@@ -479,6 +508,27 @@ class DaeguPressReleaseAdapter(KoglPressReleaseAdapter):
 
     def secure_article_url(self, article_url: str) -> str | None:
         return article_url if _is_daegu_article_url(article_url) else None
+
+
+class GangnamPressReleaseAdapter(KoglPressReleaseAdapter):
+    """Filter Gangnam articles by item license and the configured noncommercial scope."""
+
+    feed_url = GANGNAM_PRESS_RELEASE_FEED
+    date_only_publication = True
+
+    def allowed_license_types(self, source: Source) -> set[str]:
+        if settings.app_usage_mode == "noncommercial" and not source.commercial_use_allowed:
+            return {"1", "2"}
+        return {"1"}
+
+    def secure_article_url(self, article_url: str) -> str | None:
+        if not _is_gangnam_article_url(article_url):
+            return None
+        parts = urlsplit(article_url)
+        query = parse_qs(parts.query)
+        if set(query) - {"mid"} or query.get("mid", ["ID01_0313"]) != ["ID01_0313"]:
+            return None
+        return urlunsplit(("https", "www.gangnam.go.kr", parts.path, "mid=ID01_0313", ""))
 
 
 class JeonnamPressReleaseAdapter(KoglPressReleaseAdapter):

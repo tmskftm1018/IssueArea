@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 
 from app.collector import collect_source
+from app.config import settings
 from app.db import utcnow
 from app.models import CollectionRun
 from app.newsdata import ENDPOINT, LOCAL_TITLE_QUERY, NewsDataSourceAdapter
@@ -90,13 +91,15 @@ def test_http_failure_no_retry_or_key_logging(session, status):
         assert stamp >= utcnow() + timedelta(hours=23)
 
 
-def test_free_quota_guard_and_registry(session, caplog):
+def test_free_quota_guard_and_registry(session, caplog, monkeypatch):
+    monkeypatch.setattr(settings, "app_usage_mode", "commercial")
     s = source(session)
     review_source(session, s.id, review())
     with pytest.raises(ValueError):
         set_enabled(session, s.id, True)
     with pytest.raises(ValueError):
         source(session)
+    monkeypatch.setattr(settings, "app_usage_mode", "noncommercial")
     s.enabled = True
     session.add_all([CollectionRun(source_id=s.id, status="failed") for _ in range(180)])
     session.commit()

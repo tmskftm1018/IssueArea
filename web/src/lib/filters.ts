@@ -39,9 +39,8 @@ export function relativeKoreanTime(value: string): string {
     [60 * 60 * 24, "day"], [60 * 60, "hour"], [60, "minute"], [1, "second"],
   ];
   const rtf = new Intl.RelativeTimeFormat("ko-KR", { numeric: "auto" });
-  for (let i = 0; i < units.length; i++) {
-    const [seconds, unit] = units[i];
-    if (elapsedSeconds >= seconds || i === 0) {
+  for (const [seconds, unit] of units) {
+    if (elapsedSeconds >= seconds) {
       return rtf.format(-Math.floor(elapsedSeconds / seconds), unit);
     }
   }

@@ -52,6 +52,8 @@ services:
         NEXT_PUBLIC_MAP_PROVIDER: ${NEXT_PUBLIC_MAP_PROVIDER:-leaflet_osm}
         NEXT_PUBLIC_APP_ENV: ${APP_ENV:-development}
         NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-IssueArea}
+        NEXT_PUBLIC_MAP_ENABLED: ${NEXT_PUBLIC_MAP_ENABLED:-false}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
     ports: ['3000:3000']
     depends_on:
       api:

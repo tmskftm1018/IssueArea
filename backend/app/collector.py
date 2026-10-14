@@ -17,8 +17,9 @@ from app.services import can_collect, canonical_url, clean_title, title_hash
 from app.sources import (
     MODS_PRESS_RELEASE_FEED,
     MOIS_PRESS_RELEASE_FEED,
-    DemoSourceAdapter,
     DaeguPressReleaseAdapter,
+    DemoSourceAdapter,
+    GangnamPressReleaseAdapter,
     GyeonggiPressReleaseAdapter,
     JeonnamPressReleaseAdapter,
     ModsPressReleaseAdapter,
@@ -56,6 +57,7 @@ def collect_source(session, source, adapter=None):
         "gyeonggi_press_release",
         "daegu_press_release",
         "jeonnam_press_release",
+        "gangnam_press_release",
         "newswire",
         "newsdata",
     }
@@ -104,6 +106,7 @@ def collect_source(session, source, adapter=None):
             "gyeonggi_press_release": GyeonggiPressReleaseAdapter,
             "daegu_press_release": DaeguPressReleaseAdapter,
             "jeonnam_press_release": JeonnamPressReleaseAdapter,
+            "gangnam_press_release": GangnamPressReleaseAdapter,
             "newswire": NewswireSourceAdapter,
             "newsdata": NewsDataSourceAdapter,
         }
@@ -131,6 +134,7 @@ def collect_source(session, source, adapter=None):
                     "gyeonggi_press_release",
                     "daegu_press_release",
                     "jeonnam_press_release",
+                    "gangnam_press_release",
                 }:
                     raise ValueError("Update/delete events require a supported partner source")
                 if entry.action == "delete":

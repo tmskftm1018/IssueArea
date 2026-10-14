@@ -1,0 +1,78 @@
+name: Deploy IssueArea to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: Public HTTPS API URL (Cloudflare Quick Tunnel URL for a demo)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build static site
+        working-directory: web
+        env:
+          GITHUB_PAGES: "true"
+          NEXT_PUBLIC_API_BASE_URL: ${{ inputs.api_url }}
+          NEXT_PUBLIC_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          NEXT_PUBLIC_APP_ENV: production
+          NEXT_PUBLIC_APP_NAME: IssueArea
+          NEXT_PUBLIC_MAP_PROVIDER: leaflet_osm
+          NEXT_PUBLIC_MAP_ENABLED: "true"
+        run: |
+          if [[ "$NEXT_PUBLIC_API_BASE_URL" != https://* ]]; then
+            echo "Enter a public HTTPS API URL, for example https://example.trycloudflare.com." >&2
+            exit 1
+          fi
+          pnpm build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish site
+        id: deployment
+        uses: actions/deploy-pages@v5

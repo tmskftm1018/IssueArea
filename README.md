@@ -36,7 +36,7 @@
 - **재현 가능한 개발 환경** — Docker Compose로 웹, API, 수집기, PostgreSQL을 실행합니다.
 - **브라우저 흐름 검증** — Playwright로 검색·필터, 지도 확대, 오류 재시도 흐름을 확인합니다.
 
-> 현재는 개발용 Demo와 출처 연결 준비 단계입니다. 상용 뉴스 수집이나 운영 배포가 완료된 서비스는 아닙니다. 구현 및 제한 사항은 [로드맵](docs/ROADMAP.md)을 참고하세요.
+> 과제 제출용 MVP 범위입니다. 무료 뉴스 API와 권리 조건을 확인한 주요 공공기관 피드를 사용하며, 일부 후보는 권리 미검토 상태로 비활성화되어 있습니다. 상용 운영을 위한 준비가 완료된 서비스는 아닙니다. 구현 범위와 한계는 [로드맵](docs/ROADMAP.md)을 참고하세요.
 
 ## 🧱 기술 구성
 
@@ -93,9 +93,36 @@ API 시작 시 `alembic upgrade head`와 idempotent seed가 실행되고, Collec
 | NEWSDATA_API_KEY | 무료 한국 뉴스 수집용 서버 전용 비밀키 |
 | NEXT_PUBLIC_API_BASE_URL | 브라우저가 접근하는 API 주소 |
 | NEXT_PUBLIC_MAP_PROVIDER | 현재 지원: leaflet_osm |
+| NEXT_PUBLIC_MAP_ENABLED | production에서 지도를 표시하려면 true |
 | NEXT_PUBLIC_APP_NAME | 표시 서비스명 |
+| NEXT_PUBLIC_SITE_URL | 공개 사이트 주소(SEO, sitemap) |
 
 `NEXT_PUBLIC_*`와 지도 안전 설정은 빌드 시 반영되므로 변경 후 `docker compose up --build`로 재빌드합니다. 다른 기기에서 접속할 때는 API 주소와 CORS를 해당 호스트 주소로 바꿉니다.
+
+## GitHub Pages 공개
+
+웹 화면은 `.github/workflows/deploy-pages.yml`에서 Next.js 정적 사이트로 빌드해 GitHub Pages에 게시할 수 있습니다. Pages는 프론트엔드 파일만 제공하므로 FastAPI, PostgreSQL, Collector는 인터넷에서 접근 가능한 별도 서버에서 계속 실행되어야 합니다. 로컬 PC의 `localhost` 주소를 넣으면 다른 방문자는 API에 접속할 수 없습니다.
+
+### 비용 없이 잠깐 시연하기
+
+별도 서버 비용 없이 시연하려면 노트북의 Docker 백엔드를 Cloudflare Quick Tunnel로 잠시 공개할 수 있습니다. 이 방식은 개발·시연용이며 노트북, Docker, 터널 프로그램이 켜져 있는 동안만 동작합니다. Quick Tunnel 주소는 임시 주소라 터널을 다시 시작하면 바뀌고, 새 주소로 Pages를 다시 빌드해야 합니다. [Cloudflare Quick Tunnel 안내](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
+
+1. `.env`의 `CORS_ORIGINS`에 `https://tmskftm1018.github.io`를 추가하고 `docker compose up -d --build`로 서비스를 시작합니다.
+2. Windows에 `cloudflared`를 설치한 뒤 PowerShell에서 `cloudflared tunnel --url http://localhost:8000`을 실행합니다. 출력되는 `https://....trycloudflare.com` 주소가 공개 API 주소입니다.
+3. GitHub 저장소의 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 지정합니다.
+4. **Actions → Deploy IssueArea to GitHub Pages → Run workflow**를 열어 `api_url` 입력란에 그 주소를 붙여넣고 실행합니다.
+5. 시연이 끝나면 터널 창에서 `Ctrl+C`를 누릅니다.
+
+터널 주소를 아는 사람은 API에 접근할 수 있습니다. 현재 API는 뉴스·지도 조회용 GET 경로만 제공하지만, 데모가 아닐 때는 공개 서비스에 맞는 운영 설정과 데이터 출처 권한을 별도로 점검해야 합니다.
+
+### 계속 켜둘 서버에 배포하기
+
+1. 백엔드와 DB를 HTTPS 공개 주소가 있는 서버에 배포하고, API의 `CORS_ORIGINS`에 `https://tmskftm1018.github.io`를 허용합니다.
+2. Pages 배포 워크플로를 실행할 때 `api_url` 입력란에 공개 API 주소(예: `https://api.example.com`)를 입력합니다.
+3. 저장소의 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 지정합니다.
+4. **Actions → Deploy IssueArea to GitHub Pages → Run workflow**로 배포를 시작합니다. 이 저장소의 프로젝트 사이트 주소는 `https://tmskftm1018.github.io/IssueArea/`입니다.
+
+현재 워크플로는 수동 실행으로만 배포됩니다. 공개 API 주소를 준비하기 전에는 뉴스 데이터를 불러올 수 없고, 로컬 Docker만 켜둔 상태로는 사이트 방문자에게 API가 공개되지 않습니다. 무료 서버는 절전·DB 만료 등 제한이 있을 수 있으니 선택한 호스팅의 조건을 확인하세요.
 
 ## Migration / Seed / 수집기
 
@@ -131,13 +158,13 @@ docker compose exec api python -m app.source_registry list
 docker compose exec api python -m app.source_registry disable 2
 ```
 
-예시 JSON은 미검토 상태이므로 그대로 사용하면 활성화가 거부됩니다. `commercial_use_allowed`와 기타 권한은 실제 검토 결과로 설정합니다. 확인 시각은 시간대를 포함하고 미래가 아니어야 합니다. 상업 운영은 `APP_USAGE_MODE=commercial`이 필수입니다. 검토되지 않았거나 금지된 출처는 어떤 모드에서도 수집하지 않습니다. 조건부 허용은 운영자가 모든 조건을 충족한 뒤 활성화합니다. 권리 검토를 수정하면 다시 비활성화되므로 `enable`을 별도로 실행합니다. 출처 등록과 변경에 공개 API나 웹 관리자 화면은 사용하지 않습니다. 실제 출처 연결 전까지 Demo만 활성화됩니다.
+예시 JSON은 미검토 상태이므로 그대로 사용하면 활성화가 거부됩니다. `commercial_use_allowed`와 기타 권한은 실제 검토 결과로 설정합니다. 확인 시각은 시간대를 포함하고 미래가 아니어야 합니다. 상업 운영은 `APP_USAGE_MODE=commercial`이 필수입니다. 검토되지 않았거나 금지된 출처는 어떤 모드에서도 수집하지 않습니다. 조건부 허용은 운영자가 모든 조건을 충족한 뒤 활성화합니다. 권리 검토를 수정하면 다시 비활성화되므로 `enable`을 별도로 실행합니다. 출처 등록과 변경은 CLI로 처리하며, Demo와 실제 출처의 활성 여부는 로컬 `.env` 설정에 따릅니다.
 
 뉴스와이어 보도자료 API 어댑터와 카드 구분 표시를 추가했습니다. 신청·비용 확인·환경변수·출처 활성화 절차는 [연결 안내](docs/NEWSWIRE_SETUP.md)를 참고합니다. 실제 인증은 승인 및 키 발급 후 검증해야 합니다.
 
 국가데이터처 보도자료는 게시물마다 이용조건이 달라 전용 어댑터가 원문 페이지의 KOGL 유형을 확인합니다. 제1유형만 수집하고, 그 외 유형과 라이선스 확인 실패 항목은 제외합니다. 등록·심사·활성화 명령은 [국가데이터처 연결 안내](docs/MODS_SETUP.md)를 참고합니다.
 
-경기도·대구광역시·전남광주통합특별시 피드도 원문별 KOGL 1유형을 확인하는 전용 필터를 사용합니다. 대구는 활성화했고, 전남광주 피드는 현재 RSS에 2026년 6~7월 기사만 있어 비활성화했습니다. 세부 내용은 [지역 보도자료 연결 안내](docs/REGIONAL_SOURCES_SETUP.md)를 참고하세요.
+경기도·대구광역시·전남광주통합특별시 피드도 원문별 KOGL 1유형을 확인하는 전용 필터를 사용합니다. 대구는 활성화했고, 전남광주 피드는 현재 RSS에 2026년 6~7월 기사만 있어 비활성화했습니다. 강남구 보도자료는 전용 어댑터를 만들고 기존 후보 ID 4에 연결했지만 RSS 메타데이터 이용조건이 확인되지 않아 비활성 상태입니다. 세부 내용은 [지역 보도자료 연결 안내](docs/REGIONAL_SOURCES_SETUP.md), [강남구 출처 검토](docs/GANGNAM_SETUP.md)를 참고하세요.
 
 현재 개인 프로젝트의 우선 연결 경로는 **NewsData.io Free 플랜**입니다. 기본 10분 간격·한 번에 10건·추가 페이지 없음으로 크레딧을 절약합니다. 고정된 무료 플랜 지연 배지는 표시하지 않고 기사 게시 시각을 제공합니다. [무료 API 비교와 키 설정](docs/FREE_NEWS_SETUP.md)을 확인합니다.
 
@@ -209,10 +236,10 @@ docker compose exec -e DATABASE_URL=postgresql+psycopg://newsmap:newsmap@postgre
 
 ## 현재 검증과 제한
 
-- 백엔드 73개 테스트: 수집·API, 보도자료, 무료 뉴스 요청 제한·429 중단, RSS 경계, 안전한 수집 실패 로그, 출처 권리와 지역 migration을 검증합니다.
+- 백엔드 119개 테스트: 수집·API, 보도자료, 무료 뉴스 요청 제한·429 중단, RSS 경계, 안전한 수집 실패 로그, 출처 권리와 지역 migration을 검증합니다.
 - 프런트엔드 단위 테스트 9개: 필터 URL 상태 4개와 뉴스 카드·로딩·오류·빈 결과 컴포넌트 5개.
 - 타입 검사·린트·Next.js 빌드, 로컬 SQLite migration·schema check·seed·Collector와 Compose 설정 검사 수행.
-- Docker에서 PostgreSQL·API·수집기·웹 기동, migration schema check, 실제 HTTP RSS와 행 잠금 통합 테스트가 통과했습니다. 테스트용 기사는 별도 DB에만 저장됩니다.
+- Docker에서 PostgreSQL·API·수집기·웹 기동과 migration schema check가 통과했습니다. 2026-10-14 통합 테스트 DB migration 및 HTTP RSS·API 필터·중복 제거·행 잠금 검증도 통과했습니다. 테스트용 기사는 `issuearea_test` DB에만 저장됩니다.
 - 브라우저 E2E 7개: 뉴스 필터·원문 링크 보안, 지도 클러스터 확대, 시군구 선택·중심 이동·포커스 테두리, API 재시도, 빈 결과·필터 초기화, 로딩 상태, 보도자료 카드 표시를 fixture 기반으로 검증합니다. 백엔드 RSS는 3회 리다이렉트, 2 MiB 경계, 500개 entry 제한과 조건부 요청 헤더를 테스트합니다. 국가데이터처·경기도·대구·전남광주 어댑터는 공식 KOGL 링크와 유형 필터, URL 제한을 테스트합니다. 수집 실패는 URL·예외 문구를 노출하지 않고 경고 수준 JSON 로그로 기록하며 오류 유형·HTTP 상태·연속 실패 횟수·재시도 시각을 포함합니다.
 - 로컬 브라우저에서 Demo 기사·지역 집계, 서울 선택과 주제 필터를 확인했습니다. 마지막 확인 시 브라우저 error/warn 로그는 없었습니다.
 - 제목 alias로만 지역을 분류합니다. `중구`와 단독 `광주` 등 모호한 표현을 임의 지역에 배치하지 않습니다. `서울대`, `경기침체`와 같은 부분 문자열 오분류를 피하기 위해 단어 경계를 사용하며 이에 따라 일부 지역 조사형 표현은 미분류될 수 있습니다.
@@ -227,8 +254,8 @@ docker compose exec -e DATABASE_URL=postgresql+psycopg://newsmap:newsmap@postgre
 - 포트 충돌: 3000/8000 사용 프로세스를 확인하거나 Compose 포트를 변경하고 API/CORS도 함께 수정합니다.
 - 운영 시작 오류: Demo가 꺼져 있고 활성 출처의 권리가 검토되어 있는지 확인합니다.
 
-## 운영 전 확인
+## 상용화 시 추가 확인
 
-Docker/PostgreSQL 통합 검증, 실제 출처 권리 검토, Demo 비활성, usage mode 설정, 운영 지도 공급자 구현, DB 계정 교체, HTTPS/CORS·외부 요청 네트워크 제한, 백업 및 로그 정책, 브라우저 E2E를 완료해야 합니다. 현재 단계는 운영 배포 완료본이 아닙니다.
+실제 출처 권리 검토, 운영 usage mode 설정, 운영 지도 공급자 구현, DB 계정 교체, HTTPS/CORS·외부 요청 네트워크 제한, 백업·로그 정책을 별도로 마련해야 합니다. 이 항목들은 과제 제출용 MVP 범위가 아닙니다.
 
 기술 구성 참고: [Next.js 설치 문서](https://nextjs.org/docs/app/getting-started/installation), [FastAPI Docker 문서](https://fastapi.tiangolo.com/deployment/docker/).

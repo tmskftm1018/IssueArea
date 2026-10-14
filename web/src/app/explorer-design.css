@@ -1,0 +1,134 @@
+/* IssueArea: a geographic news desk. Design plan: docs/DESIGN.md. */
+:root { --ink:#1d302c; --muted:#5e716b; --line:#dce5e0; --green:#116349; --mint:#e7f2eb; --paper:#f3f6f4; }
+body { font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif; letter-spacing:-.015em; -webkit-tap-highlight-color:#11634918; }
+main { max-width:1440px; padding:0 36px; }
+.ui-icon { display:inline-block; width:20px; height:20px; flex:none; vertical-align:middle; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.skip-link { position:fixed; top:8px; left:16px; z-index:2000; padding:12px 18px; background:#fff; border:2px solid var(--green); border-radius:8px; transform:translateY(-150%); }
+.skip-link:focus { transform:translateY(0); }
+.site-header { height:76px; }
+.brand { gap:10px; color:#144433; font-size:25px; letter-spacing:-1px; }
+.brand-icon { width:36px; height:38px; border-radius:10px 10px 10px 3px; box-shadow:none; }
+.brand-icon .ui-icon { width:24px; height:24px; }
+.brand-sub { color:var(--muted); }
+.header-nav { display:flex; gap:8px; font-size:12px; font-weight:600; }
+.header-nav a { padding:10px 12px; text-decoration:none; border-radius:6px; color:var(--muted); }
+.header-nav a:hover { color:var(--green); background:var(--mint); }
+.intro { padding:29px 0 24px; gap:24px; }
+h1 { margin:0 0 9px; font-size:32px; font-weight:750; line-height:1.35; letter-spacing:-1.4px; text-wrap:balance; }
+.intro p { font-size:13px; }
+.freshness { text-align:left; min-width:200px; color:var(--green); line-height:1.5; }
+.freshness-status { font-weight:650; font-size:12px; }
+.freshness small { display:flex; align-items:center; gap:5px; margin-top:6px; color:var(--muted); font-size:11px; }
+.freshness small .ui-icon { width:13px; height:13px; }
+.status-dot { margin-right:7px; }
+.filter-panel { padding:17px 20px; margin-bottom:0; border-radius:10px; box-shadow:none; }
+.search-row { gap:18px; }
+.search-box { height:46px; border-radius:7px; background:#f7f9f8; }
+.search-box .ui-icon { color:#637d72; }
+.search-box input { font-size:16px; min-width:0; }
+.search-box input::placeholder { font-size:13px; color:#6a7d74; }
+.search-box:focus-within { border-color:#428467; box-shadow:0 0 0 3px #11634915; }
+.search-box input:focus-visible { outline:2px solid #428467; outline-offset:3px; border-radius:2px; }
+.time-select { gap:8px; font-size:12px; }
+.time-select .ui-icon { width:16px; height:16px; }
+.time-select select { background:#fff; color:var(--ink); min-width:146px; }
+.topic-row { flex-wrap:wrap; overflow:visible; white-space:normal; gap:6px; padding-top:13px; }
+.filter-label { font-size:11px; }
+.chip { min-height:34px; padding:7px 11px; font-size:11px; border-radius:5px; border-color:transparent; background:#f3f6f4; color:#4d655b; }
+.chip.active { background:var(--green); color:#fff; }
+.chip:not(.active):hover { background:#e4eee7; border-color:#cadcd0; }
+.explore-context { display:flex; justify-content:space-between; align-items:center; min-height:58px; gap:10px; font-size:12px; }
+.explore-context > span { display:flex; align-items:center; gap:8px; min-width:0; }
+.explore-context .ui-icon { width:16px; height:16px; color:var(--green); }
+.context-note { color:var(--muted); padding-left:9px; border-left:1px solid #cad7cf; font-size:11px; }
+.workspace { gap:20px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+.map-panel,.news-panel { border-radius:10px; box-shadow:none; }
+.panel-heading { min-height:84px; padding:18px 20px; background:#fff; }
+.panel-heading h2 { font-size:17px; letter-spacing:-.5px; }
+.panel-heading p { max-width:420px; font-size:11px; color:var(--muted); }
+.text-button { min-height:34px; padding:7px 8px; font-size:11px; font-weight:650; border-radius:5px; }
+.text-button:hover { background:var(--mint); }
+.map-wrap { background:#e6eeeb; }
+.map-canvas,.map-loading { height:440px; background:#e6eeeb; }
+.leaflet-tile-pane { filter:saturate(.55) brightness(1.035) contrast(.96); }
+.leaflet-interactive:focus { outline:none!important; }
+.leaflet-interactive:focus-visible { stroke:#358bbd!important; stroke-width:3px!important; }
+.leaflet-control-zoom { border:1px solid #d1dfd7!important; border-radius:7px!important; overflow:hidden; box-shadow:0 2px 8px #173d3120!important; }
+.leaflet-control-zoom a { color:#24563f!important; }
+.leaflet-control-attribution { background:#ffffffe0!important; }
+.map-marker { width:84px; min-height:40px; height:40px; padding:4px 5px 4px 9px; flex-direction:row; justify-content:space-between; gap:5px; border:1px solid #c5d8cc; border-radius:7px; background:#fff; font-size:10px; box-shadow:0 2px 7px #183b3128; }
+.map-marker::after { display:none; }
+.map-marker strong { display:grid; place-items:center; width:27px; height:27px; flex:none; border-radius:5px; background:var(--mint); color:var(--green); font-size:12px; font-variant-numeric:tabular-nums; }
+.map-marker.selected { border:1px solid var(--green); outline:none; background:var(--green); color:#fff; }
+.map-marker.selected strong { background:#ffffff26; color:#fff; }
+.region-cluster { display:flex; align-items:center; justify-content:center; flex-direction:column; gap:1px; width:48px; height:48px; border:3px solid #fff; border-radius:50%; background:#237a60; box-shadow:0 3px 12px #173d3140; color:#fff; }
+.region-cluster strong { font-size:16px; line-height:1.1; font-variant-numeric:tabular-nums; }
+.region-cluster span { font-size:9px; line-height:1.1; }
+.region-cluster:hover { background:#165941; }
+.region-cluster.selected { background:#174838; }
+.region-cluster:focus-visible,.map-marker:focus-visible { outline:3px solid #358bbd; outline-offset:3px; }
+.region-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(87px,1fr)); padding:13px 16px; gap:6px; }
+.region-list button { min-width:0; min-height:35px; justify-content:space-between; align-items:center; border:1px solid #e0e8e2; border-radius:5px; background:#fafcfb; color:#425d50; font-size:11px; }
+.region-list button strong { font-variant-numeric:tabular-nums; color:var(--green); font-size:11px; }
+.region-list button:hover:not(:disabled) { background:var(--mint); border-color:#acc8b5; }
+.region-list button.selected { border:1px solid #509373; background:var(--mint); color:#0f5941; font-weight:700; }
+.region-list[aria-label="시군구 선택"] { max-height:230px; overflow:auto; }
+.drilldown-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 16px; border-top:1px solid var(--line); background:#f7faf8; color:var(--muted); font-size:11px; }
+.map-footnote { padding:11px 16px; font-size:10px; background:#f9fbfa; color:#5d7167; }
+.news-list { padding:0 22px; max-height:665px; scrollbar-width:thin; scrollbar-color:#c1d4c7 transparent; }
+.news-card { padding:19px 0; }
+.card-region { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; font-size:11px; color:#416752; }
+.article-location { display:flex; align-items:center; gap:4px; min-width:0; }
+.article-location .ui-icon { width:13px; height:13px; }
+.content-type { margin:0; padding:3px 6px; border-radius:4px; border:1px solid #dce6e2; background:#f4f7f5; color:#5d6f66; font-size:9px; font-weight:500; }
+.news-card h3 { font-size:17px; font-weight:650; line-height:1.55; letter-spacing:-.45px; margin:8px 0 11px; text-wrap:pretty; }
+.article-title-link { text-decoration:none; }
+.article-title-link:hover { color:var(--green); text-decoration:underline; text-underline-offset:4px; }
+.article-link-icon { width:14px; height:14px; margin-left:5px; color:#6c8978; vertical-align:baseline; }
+.card-meta { color:#5d7065; font-size:11px; align-items:baseline; }
+.card-meta span { min-width:0; overflow-wrap:anywhere; }
+.card-meta time { flex:none; font-variant-numeric:tabular-nums; }
+.card-bottom { margin-top:10px; }
+.tags span { border-radius:4px; padding:3px 6px; font-size:9px; color:#5b7064; background:#f1f5f2; }
+.count-badge { background:var(--mint); color:var(--green); border-radius:5px; font-size:12px; padding:3px 7px; font-variant-numeric:tabular-nums; }
+.pagination button { min-height:34px; border-radius:5px; }
+.pagination button:hover:not(:disabled) { border-color:#87b398; color:var(--green); background:var(--mint); }
+.state-box { padding:70px 24px; }
+.primary-button:hover { background:#0d513c; }
+footer { font-size:10px; line-height:1.7; }
+#region-map,#news-list,#explore { scroll-margin-top:20px; }
+@media(min-width:1200px) { .map-panel { position:sticky; top:20px; } }
+@media(max-width:1000px) { main { padding:0 24px; } .workspace { gap:16px; } .panel-heading { padding:17px; } .news-list { padding:0 17px; } .brand-sub { display:none; } }
+@media(max-width:760px) {
+  main { padding:0 16px; }
+  .site-header { height:64px; }
+  .brand { font-size:22px; }
+  .brand-icon { width:31px; height:33px; }
+  .header-nav { gap:0; font-size:11px; }
+  .header-nav a { padding:10px 8px; }
+  .intro { padding:23px 0 18px; display:block; }
+  h1 { font-size:27px; }
+  .intro p { font-size:12px; }
+  .freshness { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:12px; }
+  .freshness small { margin:0; }
+  .freshness-status { font-size:10px; }
+  .filter-panel { padding:13px; }
+  .search-row { flex-direction:column; gap:10px; }
+  .time-select select { min-width:0; flex:1; padding:9px 12px; }
+  .filter-label { display:none; }
+  .chip { min-height:36px; }
+  .workspace { grid-template-columns:1fr; }
+  .map-panel { position:static; }
+  .map-canvas,.map-loading { height:330px; }
+  .panel-heading { min-height:78px; padding:16px; }
+  .region-list { grid-template-columns:repeat(4,minmax(0,1fr)); padding:12px; }
+  .region-list button { font-size:10px; gap:4px; padding:6px; }
+  .news-list { max-height:none; padding:0 17px; }
+  .news-card h3 { font-size:16px; }
+  .context-note { display:none; }
+  .explore-context { min-height:50px; }
+  footer span { padding-left:0; }
+}
+@media(max-width:420px) { main { padding:0 12px; } h1 { font-size:25px; } .brand { font-size:20px; gap:8px; } .header-nav a { padding:10px 6px; font-size:10px; } .region-list { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(prefers-reduced-motion:reduce) { .map-marker,.region-cluster,.chip,.region-list button { transition:none; } html { scroll-behavior:auto; } }

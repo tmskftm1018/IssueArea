@@ -17,6 +17,7 @@ from app.models import Article, CollectionRun, Source
 from app.services import can_collect, canonical_url
 from app.sources import (
     DAEGU_NEWS_FEED,
+    GANGNAM_PRESS_RELEASE_FEED,
     GYEONGGI_PRESS_RELEASE_FEED,
     JEONNAM_PRESS_RELEASE_FEED,
     MODS_PRESS_RELEASE_FEED,
@@ -80,6 +81,7 @@ def add_source(
         "gyeonggi_press_release",
         "daegu_press_release",
         "jeonnam_press_release",
+        "gangnam_press_release",
         "newswire",
         "newsdata",
     }
@@ -115,6 +117,11 @@ def add_source(
             select(Source.id).where(Source.adapter_type == "jeonnam_press_release")
         ):
             raise ValueError("Only one Jeonnam press release source can be registered")
+    if adapter == "gangnam_press_release":
+        if feed_url != GANGNAM_PRESS_RELEASE_FEED or interval < 30:
+            raise ValueError("Gangnam press releases require the official feed and 30 minutes")
+        if session.scalar(select(Source.id).where(Source.adapter_type == "gangnam_press_release")):
+            raise ValueError("Only one Gangnam press release source can be registered")
     if adapter == "newsdata":
         if feed_url != "https://newsdata.io/api/1/latest" or interval < 10:
             raise ValueError("NewsData requires the official endpoint and at least 10 minutes")
@@ -164,6 +171,7 @@ def add_source(
         adapter_to_placeholder = {
             "daegu_press_release": "rss_press_release",
             "jeonnam_press_release": "rss_press_release",
+            "gangnam_press_release": "rss_press_release",
         }
         if (
             adapter in adapter_to_placeholder
@@ -228,6 +236,7 @@ def set_enabled(session, source_id: int, enabled: bool):
                 "gyeonggi_press_release",
                 "daegu_press_release",
                 "jeonnam_press_release",
+                "gangnam_press_release",
                 "newswire",
                 "newsdata",
             }
@@ -266,6 +275,12 @@ def set_enabled(session, source_id: int, enabled: bool):
                 or source.collection_interval_minutes < 30
             ):
                 raise ValueError("Invalid Jeonnam press release source configuration")
+        if source.adapter_type == "gangnam_press_release":
+            if (
+                source.feed_url != GANGNAM_PRESS_RELEASE_FEED
+                or source.collection_interval_minutes < 30
+            ):
+                raise ValueError("Invalid Gangnam press release source configuration")
         if source.adapter_type == "newswire":
             if source.feed_url != "https://www.newswire.co.kr/api/v1/request":
                 raise ValueError("Newswire requires the official endpoint")
@@ -342,6 +357,7 @@ def main(argv=None):
             "gyeonggi_press_release",
             "daegu_press_release",
             "jeonnam_press_release",
+            "gangnam_press_release",
             "newswire",
             "newsdata",
         ],

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { defaults, queryFor, readFilters, safeArticleUrl } from "./filters.ts";
+import { defaults, queryFor, readFilters, relativeKoreanTime, safeArticleUrl } from "./filters.ts";
 describe("filter URL semantics", () => {
   it("restores shared URL state", () => {
     const state = { ...defaults, region: "KR-11", topics: ["economy", "technology"], q: "반도체", page: 2 };
@@ -25,5 +25,11 @@ describe("filter URL semantics", () => {
     assert.equal(safeArticleUrl("javascript:alert(1)"), false);
     assert.equal(safeArticleUrl("https://user:password@example.com"), false);
     assert.equal(safeArticleUrl("https://example.com/news/demo-001"), true);
+  });
+  it("shows useful relative times instead of labeling every recent article as this year", () => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    assert.equal(relativeKoreanTime(oneHourAgo), "1시간 전");
+    assert.equal(relativeKoreanTime(twoDaysAgo), "그저께");
   });
 });

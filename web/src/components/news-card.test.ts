@@ -24,7 +24,7 @@ describe("NewsCard", () => {
   it("renders region, source and topic metadata with a safe original link", () => {
     const markup = renderToStaticMarkup(createElement(NewsCard, { article: makeArticle() }));
 
-    expect(markup).toContain("관련 지역 · 서울특별시");
+    expect(markup).toMatch(/class="article-location".*서울특별시<\/span>/);
     expect(markup).toContain("테스트 언론사");
     expect(markup).toContain("사회");
     expect(markup).toContain(
@@ -47,7 +47,7 @@ describe("NewsCard", () => {
     );
 
     expect(markup).toContain("<strong class=\"content-type\">보도자료</strong>");
-    expect(markup).toContain("관련 지역 · 전국");
+    expect(markup).toMatch(/class="article-location".*전국<\/span>/);
     expect(markup).toContain("&lt;script&gt;alert(1)&lt;/script&gt; 보도자료");
     expect(markup).not.toContain("<a ");
     expect(markup).not.toContain("javascript:");
